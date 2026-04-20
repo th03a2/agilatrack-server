@@ -2,15 +2,37 @@ import mongoose from "mongoose";
 
 const { Schema } = mongoose;
 
+export const AFFILIATION_STATUSES = [
+  "draft",
+  "pending",
+  "approved",
+  "rejected",
+  "deactivated",
+];
+
+export const AFFILIATION_TYPES = [
+  "racer",
+  "officer",
+  "organizer",
+  "staff",
+];
+
+export const AFFILIATION_ROLES = [
+  "racer",
+  "club_admin",
+  "organizer",
+  "check_in_officer",
+  "race_secretary",
+  "treasurer",
+];
+
 const deactivationSchema = new Schema(
   {
     by: {
       type: Schema.Types.ObjectId,
       ref: "Users",
     },
-    at: {
-      type: String,
-    },
+    at: { type: String },
     for: {
       type: Schema.Types.ObjectId,
       ref: "Violations",
@@ -19,115 +41,180 @@ const deactivationSchema = new Schema(
   { _id: false },
 );
 
-const scopedAssignmentSchema = new Schema(
+const approvalSchema = new Schema(
   {
-    type: {
-      type: String,
-      required: true,
-      trim: true,
-      lowercase: true,
+    requestedAt: {
+      type: Date,
+      default: Date.now,
     },
-    refId: {
+    approvedAt: { type: Date },
+    approvedBy: {
       type: Schema.Types.ObjectId,
-      required: true,
+      ref: "Users",
     },
-    refModel: {
-      type: String,
-      trim: true,
+    rejectedAt: { type: Date },
+    rejectedBy: {
+      type: Schema.Types.ObjectId,
+      ref: "Users",
     },
-    role: { type: Number },
-    scope: {
-      type: String,
-      trim: true,
-    },
-    status: {
-      type: String,
-      enum: {
-        values: ["pending", "approved", "rejected", "inactive"],
-        message: "Please choose a valid assignment status.",
-      },
-      default: "pending",
-    },
-    remarks: { type: Array, default: [] },
-    meta: { type: Schema.Types.Mixed, default: null },
-    deactivated: {
-      type: deactivationSchema,
-      default: () => ({}),
-    },
+    reason: { type: String, trim: true },
   },
-  {
-    _id: false,
-  },
+  { _id: false },
 );
 
 const modelSchema = new Schema(
   {
     user: {
-      type: mongoose.Schema.Types.ObjectId,
+      type: Schema.Types.ObjectId,
       ref: "Users",
       required: true,
     },
     club: {
-      type: mongoose.Schema.Types.ObjectId,
+      type: Schema.Types.ObjectId,
       ref: "Clubs",
+      required: true,
     },
+    memberCode: {
+      type: String,
+      uppercase: true,
+      trim: true,
+      minlength: 3,
+      maxlength: 32,
+      match: [
+        /^[A-Z0-9][A-Z0-9.-]*$/,
+        "Member code must use uppercase letters, numbers, dashes, and dots only.",
+      ],
+    },
+    membershipType: {
+      type: String,
+      enum: AFFILIATION_TYPES,
+      default: "racer",
+      trim: true,
+      lowercase: true,
+    },
+    roles: [
+      {
+        type: String,
+        enum: AFFILIATION_ROLES,
+        trim: true,
+        lowercase: true,
+      },
+    ],
     mobile: { type: String },
-    activePlatform: {
-      _id: { type: Schema.Types.ObjectId, ref: "Affiliations" },
-      club: { type: Schema.Types.ObjectId, ref: "Clubs" },
-      role: { type: Number },
-      portal: {
+    primaryLoft: {
+      type: Schema.Types.ObjectId,
+      ref: "Lofts",
+    },
+    lofts: [
+      {
+        type: Schema.Types.ObjectId,
+        ref: "Lofts",
+      },
+    ],
+    racing: {
+      licenseNumber: {
+        type: String,
+        trim: true,
+        uppercase: true,
+      },
+      bandPrefix: {
+        type: String,
+        trim: true,
+        uppercase: true,
+      },
+      clockSystem: {
         type: String,
         trim: true,
       },
-      // access to the primary portals
-      access: [{ type: Number }],
-    },
-    validation: {
-      academicValidator: {
-        type: mongoose.Schema.Types.ObjectId,
-        ref: "Affiliations",
+      clockId: {
+        type: String,
+        trim: true,
+        uppercase: true,
       },
-      academicValidatees: [
-        {
-          type: mongoose.Schema.Types.ObjectId,
-          ref: "Affiliations",
-        },
-      ],
     },
-    // Employee only
     tagline: { type: String },
-    // Personalized card template
-    ct: { type: String },
-    dfp: { type: String },
+    approval: {
+      type: approvalSchema,
+      default: () => ({}),
+    },
     status: {
       type: String,
       enum: {
-        values: ["draft", "pending", "approved", "rejected", "deactivated"],
-        message: "Please choose a valid type from the predefined options.",
+        values: AFFILIATION_STATUSES,
+        message: "Please choose a valid affiliation status.",
       },
-      default: "draft",
+      default: "pending",
     },
     deactivated: {
-      by: {
-        type: Schema.Types.ObjectId,
-        ref: "Users",
-      },
-      at: {
-        type: String,
-      },
-      for: {
-        type: Schema.Types.ObjectId,
-        ref: "Violations",
-      },
+      type: deactivationSchema,
+      default: () => ({}),
     },
-
-    remarks: { type: Array },
+    remarks: { type: [String], default: [] },
+    deletedAt: { type: String },
   },
   {
     timestamps: true,
+    toJSON: { virtuals: true },
+    toObject: { virtuals: true },
   },
 );
+
+modelSchema.virtual("isApproved").get(function getIsApproved() {
+  return this.status === "approved" && !this.deletedAt;
+});
+
+modelSchema.pre("validate", function normalizeAffiliation(next) {
+  if (!this.roles?.length) {
+    this.roles = [this.membershipType || "racer"];
+  }
+
+  if (this.primaryLoft) {
+    const hasPrimaryLoft = this.lofts?.some((loft) =>
+      String(loft) === String(this.primaryLoft),
+    );
+
+    if (!hasPrimaryLoft) {
+      this.lofts = [...(this.lofts || []), this.primaryLoft];
+    }
+  }
+
+  if (this.status === "approved" && !this.approval?.approvedAt) {
+    this.approval = {
+      ...(this.approval || {}),
+      approvedAt: new Date(),
+    };
+  }
+
+  if (this.status === "rejected" && !this.approval?.rejectedAt) {
+    this.approval = {
+      ...(this.approval || {}),
+      rejectedAt: new Date(),
+    };
+  }
+
+  next();
+});
+
+modelSchema.index(
+  { user: 1, club: 1 },
+  {
+    unique: true,
+    partialFilterExpression: { deletedAt: { $exists: false } },
+  },
+);
+modelSchema.index(
+  { club: 1, memberCode: 1 },
+  {
+    unique: true,
+    partialFilterExpression: {
+      memberCode: { $exists: true },
+      deletedAt: { $exists: false },
+    },
+  },
+);
+modelSchema.index({ club: 1, status: 1, membershipType: 1 });
+modelSchema.index({ user: 1, status: 1 });
+modelSchema.index({ primaryLoft: 1 });
 
 const Entity = mongoose.model("Affiliations", modelSchema);
 

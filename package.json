@@ -5,7 +5,9 @@
   "type": "module",
   "scripts": {
     "dev": "nodemon server.js",
-    "start": "node server.js"
+    "start": "node server.js",
+    "seed": "node seeders/seedAgilaTrack.js",
+    "seed:reset": "node seeders/seedAgilaTrack.js --reset"
   },
   "keywords": [],
   "author": "",

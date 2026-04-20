@@ -8,6 +8,8 @@ import affiliationsRouter from "./routes/affiliations.js";
 import clubsRouter from "./routes/clubs.js";
 import loftsRouter from "./routes/lofts.js";
 import officersRouter from "./routes/officers.js";
+import raceEntriesRouter from "./routes/raceEntries.js";
+import racesRouter from "./routes/races.js";
 import { apiRoutes, logApiRoutes } from "./routes/index.js";
 import usersRouter from "./routes/users.js";
 
@@ -27,6 +29,8 @@ app.use("/api/affiliations", affiliationsRouter);
 app.use("/api/clubs", clubsRouter);
 app.use("/api/lofts", loftsRouter);
 app.use("/api/officers", officersRouter);
+app.use("/api/race-entries", raceEntriesRouter);
+app.use("/api/races", racesRouter);
 app.use("/api/users", usersRouter);
 
 app.get("/api/routes", (req, res) => {
@@ -47,6 +51,8 @@ app.get("/", (req, res) => {
       clubLevels: "/api/clubs/meta/levels",
       lofts: "/api/lofts",
       officers: "/api/officers",
+      raceEntries: "/api/race-entries",
+      races: "/api/races",
       routes: "/api/routes",
       users: "/api/users",
     },
