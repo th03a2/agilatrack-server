@@ -4,6 +4,7 @@ import dotenv from "dotenv";
 import cors from "cors";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
+import authRouter from "./routes/auth.js";
 import affiliationsRouter from "./routes/affiliations.js";
 import clubsRouter from "./routes/clubs.js";
 import loftsRouter from "./routes/lofts.js";
@@ -25,6 +26,7 @@ const MONGO_URI = process.env.MONGO_URI;
 app.use(cors());
 app.use(express.json());
 
+app.use("/api/auth", authRouter);
 app.use("/api/affiliations", affiliationsRouter);
 app.use("/api/clubs", clubsRouter);
 app.use("/api/lofts", loftsRouter);
@@ -46,6 +48,7 @@ app.get("/", (req, res) => {
     success: "AgilaTrack API running",
     endpoints: {
       affiliations: "/api/affiliations",
+      auth: "/api/auth/login",
       clubs: "/api/clubs",
       clubPyramid: "/api/clubs/pyramid",
       clubLevels: "/api/clubs/meta/levels",

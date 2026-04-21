@@ -1,6 +1,7 @@
 export const apiRoutes = [
   { path: "/", description: "API health and endpoint summary" },
   { path: "/api/routes", description: "List available API route groups" },
+  { path: "/api/auth/login", description: "Authenticate users with email and password" },
   { path: "/api/clubs", description: "Manage clubs, hierarchy, pyramid, children, and club details" },
   { path: "/api/lofts", description: "Manage lofts and loft location details" },
   { path: "/api/users", description: "Manage users and user profiles" },
