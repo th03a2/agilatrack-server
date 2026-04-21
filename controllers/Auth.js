@@ -1,5 +1,6 @@
 import crypto from "node:crypto";
 import Users from "../models/Users.js";
+import Affiliations from "../models/Affiliations.js";
 
 const USER_SELECT =
   "_id email fullName activePlatform membership state mobile isActive createdAt updatedAt";
@@ -33,11 +34,21 @@ export const login = async (req, res) => {
     const payload = await Users.findById(user._id)
       .select(USER_SELECT)
       .lean({ virtuals: true });
+    const affiliations = await Affiliations.find({
+      user: user._id,
+      deletedAt: { $exists: false },
+      status: "approved",
+    })
+      .populate("club", "name code abbr level location")
+      .select("_id club memberCode membershipType roles status")
+      .sort({ updatedAt: -1 })
+      .lean({ virtuals: true });
 
     res.json({
       success: "Login successful",
       payload: {
         user: payload,
+        affiliations,
         token: crypto.randomBytes(32).toString("hex"),
       },
     });
