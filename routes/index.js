@@ -4,6 +4,8 @@ export const apiRoutes = [
   { path: "/api/auth/login", description: "Authenticate users with email and password" },
   { path: "/api/clubs", description: "Manage clubs, hierarchy, pyramid, children, and club details" },
   { path: "/api/lofts", description: "Manage lofts and loft location details" },
+  { path: "/api/pigeons", description: "Manage pigeon profiles, ownership, pedigree, and health records" },
+  { path: "/api/pegions", description: "Alias for /api/pigeons" },
   { path: "/api/users", description: "Manage users and user profiles" },
   { path: "/api/affiliations", description: "Manage user club memberships and racing profiles" },
   { path: "/api/officers", description: "Manage club officers and authorizations" },

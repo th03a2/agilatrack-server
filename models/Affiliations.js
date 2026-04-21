@@ -10,21 +10,7 @@ export const AFFILIATION_STATUSES = [
   "deactivated",
 ];
 
-export const AFFILIATION_TYPES = [
-  "racer",
-  "officer",
-  "organizer",
-  "staff",
-];
-
-export const AFFILIATION_ROLES = [
-  "racer",
-  "club_admin",
-  "organizer",
-  "check_in_officer",
-  "race_secretary",
-  "treasurer",
-];
+export const AFFILIATION_TYPES = ["racer", "officer", "organizer", "staff"];
 
 const deactivationSchema = new Schema(
   {
@@ -92,14 +78,7 @@ const modelSchema = new Schema(
       trim: true,
       lowercase: true,
     },
-    roles: [
-      {
-        type: String,
-        enum: AFFILIATION_ROLES,
-        trim: true,
-        lowercase: true,
-      },
-    ],
+    roles: [{ type: Number }],
     mobile: { type: String },
     primaryLoft: {
       type: Schema.Types.ObjectId,
@@ -169,8 +148,8 @@ modelSchema.pre("validate", function normalizeAffiliation(next) {
   }
 
   if (this.primaryLoft) {
-    const hasPrimaryLoft = this.lofts?.some((loft) =>
-      String(loft) === String(this.primaryLoft),
+    const hasPrimaryLoft = this.lofts?.some(
+      (loft) => String(loft) === String(this.primaryLoft),
     );
 
     if (!hasPrimaryLoft) {

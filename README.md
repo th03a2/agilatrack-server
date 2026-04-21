@@ -27,6 +27,7 @@ The seeder creates a realistic Philippine racing pigeon sample network:
 - Provincial associations: Cavite, Laguna, and Tarlac
 - Municipality clubs: Indang, Silang, Calamba, and Tarlac City
 - Users, affiliations, lofts, and officers
+- Pigeon profiles, ownership, pedigree, and health records
 - Sample races and race entries for booking, check-in, boarding, departure, arrival, speed, distance, and ranking
 
 Run without deleting existing matching seed records:
@@ -98,6 +99,17 @@ Lofts:
 | POST | `/api/lofts` | Create loft |
 | PUT | `/api/lofts/:id` | Update loft |
 | DELETE | `/api/lofts/:id` | Archive loft |
+
+Pigeons:
+
+| Method | Path | Description |
+| --- | --- | --- |
+| GET | `/api/pigeons` | List pigeons |
+| GET | `/api/pigeons/:id` | Fetch one pigeon |
+| POST | `/api/pigeons` | Create pigeon |
+| PUT | `/api/pigeons/:id` | Update pigeon |
+| DELETE | `/api/pigeons/:id` | Archive pigeon |
+| ANY | `/api/pegions/*` | Alias for `/api/pigeons/*` |
 
 Users:
 
