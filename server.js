@@ -58,7 +58,6 @@ app.get("/", (req, res) => {
       lofts: "/api/lofts",
       officers: "/api/officers",
       pigeons: "/api/pigeons",
-      pegions: "/api/pegions",
       raceEntries: "/api/race-entries",
       races: "/api/races",
       routes: "/api/routes",
