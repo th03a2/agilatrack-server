@@ -7,6 +7,7 @@ import { fileURLToPath } from "node:url";
 import authRouter from "./routes/auth.js";
 import affiliationsRouter from "./routes/affiliations.js";
 import clubsRouter from "./routes/clubs.js";
+import cratesRouter from "./routes/crates.js";
 import loftsRouter from "./routes/lofts.js";
 import officersRouter from "./routes/officers.js";
 import pigeonsRouter from "./routes/pigeons.js";
@@ -30,6 +31,7 @@ app.use(express.json());
 app.use("/api/auth", authRouter);
 app.use("/api/affiliations", affiliationsRouter);
 app.use("/api/clubs", clubsRouter);
+app.use("/api/crates", cratesRouter);
 app.use("/api/lofts", loftsRouter);
 app.use("/api/officers", officersRouter);
 app.use("/api/pigeons", pigeonsRouter);
@@ -53,6 +55,7 @@ app.get("/", (req, res) => {
       affiliations: "/api/affiliations",
       auth: "/api/auth/login",
       clubs: "/api/clubs",
+      crates: "/api/crates",
       clubPyramid: "/api/clubs/pyramid",
       clubLevels: "/api/clubs/meta/levels",
       lofts: "/api/lofts",

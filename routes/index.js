@@ -3,6 +3,7 @@ export const apiRoutes = [
   { path: "/api/routes", description: "List available API route groups" },
   { path: "/api/auth/login", description: "Authenticate users with email and password" },
   { path: "/api/clubs", description: "Manage clubs, hierarchy, pyramid, children, and club details" },
+  { path: "/api/crates", description: "Manage crate inventory, assignments, capacity, seals, and condition checks" },
   { path: "/api/lofts", description: "Manage lofts and loft location details" },
   { path: "/api/pigeons", description: "Manage pigeon profiles, ownership, pedigree, and health records" },
   { path: "/api/pegions", description: "Alias for /api/pigeons" },
