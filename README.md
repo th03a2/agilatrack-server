@@ -4,7 +4,7 @@ Express and MongoDB API for AgilaTrack club, loft, affiliation, officer, and rac
 
 ## Setup
 
-Create `server/.env` with:
+Create `server/.env` from the example file:
 
 ```env
 MONGO_URI=your_mongodb_connection_string
@@ -17,6 +17,21 @@ Install dependencies and run the API:
 npm install
 npm run dev
 ```
+
+For teammates cloning the project:
+
+1. Run `npm install` inside the `server` folder.
+2. Copy `server/.env.example` to `server/.env`.
+3. Replace `MONGO_URI` with the shared MongoDB Atlas connection string.
+4. In MongoDB Atlas, add their current public IP address under **Network Access**.
+5. Start the backend with `npm run dev`.
+
+If the backend works on one computer but not another, the most common causes are:
+
+- `server/.env` is missing because `.env` is intentionally ignored by Git.
+- The teammate's IP address is not allowed in MongoDB Atlas Network Access.
+- The Atlas database username or password is different from the connection string.
+- Port `5000` is already in use on their machine.
 
 ## Seed Data
 

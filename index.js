@@ -85,6 +85,22 @@ const getMongoConnectionSummary = (uri) => {
 };
 
 const logMongoStartupError = (error) => {
+  if (
+    error?.name === "MongooseServerSelectionError" ||
+    /querySrv|ENOTFOUND|ETIMEDOUT|ECONNREFUSED|IP address/i.test(error?.message || "")
+  ) {
+    const summary = getMongoConnectionSummary(MONGO_URI);
+
+    console.error("MongoDB connection could not be reached.");
+    if (summary) {
+      console.error(`Trying to connect to "${summary.host}" as "${summary.user}".`);
+    }
+    console.error(
+      "Check your internet connection, MongoDB Atlas Network Access IP whitelist, and the MONGO_URI value in server/.env.",
+    );
+    return;
+  }
+
   if (error?.codeName === "AtlasError" && /bad auth/i.test(error.message)) {
     const summary = getMongoConnectionSummary(MONGO_URI);
 
