@@ -11,6 +11,22 @@ export const AFFILIATION_STATUSES = [
 ];
 
 export const AFFILIATION_TYPES = ["racer", "officer", "organizer", "staff"];
+const AFFILIATION_ROLE_IDS = {
+  racer: 2,
+  officer: 10,
+  organizer: 20,
+  staff: 74,
+};
+
+const normalizeAffiliationRole = (role) => {
+  const roleId = Number(role);
+
+  if (!Number.isNaN(roleId)) {
+    return roleId;
+  }
+
+  return AFFILIATION_ROLE_IDS[String(role).trim().toLowerCase()] || role;
+};
 
 const deactivationSchema = new Schema(
   {
@@ -143,8 +159,12 @@ modelSchema.virtual("isApproved").get(function getIsApproved() {
 });
 
 modelSchema.pre("validate", function normalizeAffiliation(next) {
-  if (!this.roles?.length) {
-    this.roles = [this.membershipType || "racer"];
+  if (this.roles?.length) {
+    this.roles = this.roles.map(normalizeAffiliationRole);
+  } else {
+    this.roles = [
+      AFFILIATION_ROLE_IDS[this.membershipType] || AFFILIATION_ROLE_IDS.racer,
+    ];
   }
 
   if (this.primaryLoft) {

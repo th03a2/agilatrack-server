@@ -7,8 +7,8 @@ Express and MongoDB API for AgilaTrack club, loft, affiliation, officer, and rac
 Create `server/.env` from the example file:
 
 ```env
-MONGO_URI=your_mongodb_connection_string
 PORT=5000
+MONGO_URI=mongodb+srv://<username>:<password>@<cluster-host>/racingHub?retryWrites=true&w=majority&authSource=admin&appName=AgilaTracker
 ```
 
 Install dependencies and run the API:
@@ -22,7 +22,7 @@ For teammates cloning the project:
 
 1. Run `npm install` inside the `server` folder.
 2. Copy `server/.env.example` to `server/.env`.
-3. Replace `MONGO_URI` with the shared MongoDB Atlas connection string.
+3. Replace `MONGO_URI` with the shared MongoDB Atlas connection string, including the database path and `authSource=admin`.
 4. In MongoDB Atlas, add their current public IP address under **Network Access**.
 5. Start the backend with `npm run dev`.
 

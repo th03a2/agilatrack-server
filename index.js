@@ -3,6 +3,7 @@ import mongoose from "mongoose";
 import dotenv from "dotenv";
 import cors from "cors";
 import path from "node:path";
+import dns from "node:dns";
 import { fileURLToPath } from "node:url";
 import authRouter from "./routes/auth.js";
 import affiliationsRouter from "./routes/affiliations.js";
@@ -20,6 +21,7 @@ const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
 dotenv.config({ path: path.join(__dirname, ".env"), quiet: true });
+dns.setServers(["1.1.1.1", "8.8.8.8"]);
 
 const app = express();
 const PORT = process.env.PORT || 5000;
@@ -104,6 +106,7 @@ const logMongoStartupError = (error) => {
 
   if (error?.codeName === "AtlasError" && /bad auth/i.test(error.message)) {
     const summary = getMongoConnectionSummary(MONGO_URI);
+    const hasAtlasAuthShape = summary?.database !== "(none)" && summary?.authSource === "admin";
 
     console.error("MongoDB authentication failed.");
     if (summary) {
@@ -112,7 +115,9 @@ const logMongoStartupError = (error) => {
       );
     }
     console.error(
-      "Check the Atlas database user's username/password, make sure special characters in the password are URL-encoded, and try adding authSource=admin to MONGO_URI if the user was created in Atlas.",
+      hasAtlasAuthShape
+        ? "Atlas is reachable, but it rejected the database user's credentials. Reset the Atlas Database Access password, update MONGO_URI, and URL-encode any special characters in the password."
+        : "Check the Atlas database user's username/password, make sure special characters in the password are URL-encoded, and add a database path with authSource=admin to MONGO_URI if the user was created in Atlas.",
     );
     return;
   }

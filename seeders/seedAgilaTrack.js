@@ -1,6 +1,7 @@
 import dotenv from "dotenv";
 import mongoose from "mongoose";
 import path from "node:path";
+import dns from "node:dns";
 import { fileURLToPath } from "node:url";
 import Affiliations from "../models/Affiliations.js";
 import Clubs from "../models/Clubs.js";
@@ -14,6 +15,7 @@ const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
 dotenv.config({ path: path.join(__dirname, "..", ".env"), quiet: true });
+dns.setServers(["1.1.1.1", "8.8.8.8"]);
 
 const MONGO_URI = process.env.MONGO_URI;
 const shouldReset = process.argv.includes("--reset");
@@ -708,11 +710,12 @@ const raceEntrySeeds = [
   },
 ];
 
+const racingMemberRole = 2;
 const roleByOfficer = {
-  President: 1,
-  Secretary: 2,
-  Treasurer: 3,
-  "Race Secretary": 4,
+  President: 10,
+  Secretary: 12,
+  Treasurer: 13,
+  "Race Secretary": 21,
 };
 
 const memberCodeByUserKey = {
@@ -827,7 +830,7 @@ const upsertAffiliation = async ({ userSeed, usersByKey, clubsByKey, loftsByKey 
   const user = usersByKey[userSeed.key];
   const club = clubsByKey[userSeed.clubKey];
   const loft = loftsByKey[userSeed.loftKey];
-  const officerRole = roleByOfficer[userSeed.officer] || 1;
+  const officerRole = roleByOfficer[userSeed.officer] || racingMemberRole;
 
   const affiliation =
     (await Affiliations.findOne({ user: user._id, club: club._id })) ||
@@ -838,7 +841,7 @@ const upsertAffiliation = async ({ userSeed, usersByKey, clubsByKey, loftsByKey 
     club: club._id,
     memberCode: memberCodeByUserKey[userSeed.key],
     membershipType: "racer",
-    roles: ["racer"],
+    roles: [racingMemberRole],
     mobile: user.mobile,
     primaryLoft: loft._id,
     lofts: [loft._id],
