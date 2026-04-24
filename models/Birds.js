@@ -2,8 +2,8 @@ import mongoose from "mongoose";
 
 const { Schema } = mongoose;
 
-export const PIGEON_SEXES = ["cock", "hen", "unknown"];
-export const PIGEON_STATUSES = [
+export const BIRD_SEXES = ["cock", "hen", "unknown"];
+export const BIRD_STATUSES = [
   "active",
   "breeding",
   "training",
@@ -18,7 +18,7 @@ const parentSchema = new Schema(
   {
     pigeon: {
       type: Schema.Types.ObjectId,
-      ref: "Pigeons",
+      ref: "Birds",
     },
     bandNumber: {
       type: String,
@@ -81,7 +81,7 @@ const modelSchema = new Schema(
     },
     sex: {
       type: String,
-      enum: PIGEON_SEXES,
+      enum: BIRD_SEXES,
       default: "unknown",
     },
     color: {
@@ -148,7 +148,7 @@ const modelSchema = new Schema(
     },
     status: {
       type: String,
-      enum: PIGEON_STATUSES,
+      enum: BIRD_STATUSES,
       default: "active",
     },
     remarks: {
@@ -170,7 +170,7 @@ modelSchema.virtual("isRaceEligible").get(function getIsRaceEligible() {
   return ["active", "training"].includes(this.status) && !this.deletedAt;
 });
 
-modelSchema.pre("validate", function normalizePigeon(next) {
+modelSchema.pre("validate", function normalizeBird(next) {
   if (!this.hatchYear && this.hatchDate) {
     this.hatchYear = this.hatchDate.getFullYear();
   }
@@ -190,6 +190,6 @@ modelSchema.index({ affiliation: 1, status: 1, deletedAt: 1 });
 modelSchema.index({ loft: 1, status: 1, deletedAt: 1 });
 modelSchema.index({ club: 1, status: 1, createdAt: -1 });
 
-const Entity = mongoose.model("Pigeons", modelSchema);
+const Entity = mongoose.model("Birds", modelSchema, "pigeons");
 
 export default Entity;

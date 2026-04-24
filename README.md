@@ -2,6 +2,8 @@
 
 Express and MongoDB API for AgilaTrack club, loft, affiliation, officer, and racing data.
 
+Commerce backend files are grouped in `server/commerce` so they are easier to find.
+
 ## Setup
 
 Create `server/.env` from the example file:
@@ -35,14 +37,14 @@ If the backend works on one computer but not another, the most common causes are
 
 ## Seed Data
 
-The seeder creates a realistic Philippine racing pigeon sample network:
+The seeder creates a realistic Philippine racing bird sample network:
 
 - National federation: Philippine Homing Pigeon Racing Federation
 - Regional councils: CALABARZON and Central Luzon
 - Provincial associations: Cavite, Laguna, and Tarlac
 - Municipality clubs: Indang, Silang, Calamba, and Tarlac City
 - Users, affiliations, lofts, and officers
-- Pigeon profiles, ownership, pedigree, and health records
+- Bird profiles, ownership, pedigree, and health records
 - Sample races and race entries for booking, check-in, boarding, departure, arrival, speed, distance, and ranking
 
 Run without deleting existing matching seed records:
@@ -89,96 +91,117 @@ Health and route list:
 | Method | Path | Description |
 | --- | --- | --- |
 | GET | `/` | API health and endpoint summary |
-| GET | `/api/routes` | List available API routes |
+| GET | `/nbi/routes` | List available NBI routes |
 
 Clubs:
 
 | Method | Path | Description |
 | --- | --- | --- |
-| GET | `/api/clubs` | List clubs |
-| GET | `/api/clubs/meta/levels` | List club hierarchy levels |
-| GET | `/api/clubs/pyramid` | Fetch full club pyramid |
-| GET | `/api/clubs/:id/tree` | Fetch club subtree |
-| GET | `/api/clubs/:id/children` | Fetch direct child clubs |
-| GET | `/api/clubs/:id` | Fetch one club |
-| POST | `/api/clubs` | Create club |
-| PUT | `/api/clubs/:id` | Update club |
-| DELETE | `/api/clubs/:id` | Archive club |
+| GET | `/nbi/clubs` | List clubs |
+| GET | `/nbi/clubs/meta/levels` | List club hierarchy levels |
+| GET | `/nbi/clubs/pyramid` | Fetch full club pyramid |
+| GET | `/nbi/clubs/:id/tree` | Fetch club subtree |
+| GET | `/nbi/clubs/:id/children` | Fetch direct child clubs |
+| GET | `/nbi/clubs/:id` | Fetch one club |
+| POST | `/nbi/clubs` | Create club |
+| PUT | `/nbi/clubs/:id` | Update club |
+| DELETE | `/nbi/clubs/:id` | Archive club |
 
 Lofts:
 
 | Method | Path | Description |
 | --- | --- | --- |
-| GET | `/api/lofts` | List lofts |
-| GET | `/api/lofts/:id` | Fetch one loft |
-| POST | `/api/lofts` | Create loft |
-| PUT | `/api/lofts/:id` | Update loft |
-| DELETE | `/api/lofts/:id` | Archive loft |
+| GET | `/nbi/lofts` | List lofts |
+| GET | `/nbi/lofts/:id` | Fetch one loft |
+| POST | `/nbi/lofts` | Create loft |
+| PUT | `/nbi/lofts/:id` | Update loft |
+| DELETE | `/nbi/lofts/:id` | Archive loft |
 
-Pigeons:
+Birds:
 
 | Method | Path | Description |
 | --- | --- | --- |
-| GET | `/api/pigeons` | List pigeons |
-| GET | `/api/pigeons/:id` | Fetch one pigeon |
-| POST | `/api/pigeons` | Create pigeon |
-| PUT | `/api/pigeons/:id` | Update pigeon |
-| DELETE | `/api/pigeons/:id` | Archive pigeon |
-| ANY | `/api/pegions/*` | Alias for `/api/pigeons/*` |
+| GET | `/nbi/birds` | List birds |
+| GET | `/nbi/birds/:id` | Fetch one bird |
+| POST | `/nbi/birds` | Create bird |
+| PUT | `/nbi/birds/:id` | Update bird |
+| DELETE | `/nbi/birds/:id` | Archive bird |
+| ANY | `/nbi/pigeons/*` | Legacy alias for `/nbi/birds/*` |
+| ANY | `/nbi/pegions/*` | Legacy alias for `/nbi/birds/*` |
 
 Users:
 
 | Method | Path | Description |
 | --- | --- | --- |
-| GET | `/api/users` | List users |
-| GET | `/api/users/:id` | Fetch one user |
-| POST | `/api/users` | Create user |
-| PUT | `/api/users/:id` | Update user |
-| DELETE | `/api/users/:id` | Deactivate user |
+| GET | `/nbi/users` | List users |
+| GET | `/nbi/users/:id` | Fetch one user |
+| POST | `/nbi/users` | Create user |
+| PUT | `/nbi/users/:id` | Update user |
+| DELETE | `/nbi/users/:id` | Deactivate user |
 
 Affiliations:
 
 | Method | Path | Description |
 | --- | --- | --- |
-| GET | `/api/affiliations` | List affiliations |
-| GET | `/api/affiliations/:id` | Fetch one affiliation |
-| POST | `/api/affiliations` | Create affiliation |
-| PUT | `/api/affiliations/:id` | Update affiliation |
-| DELETE | `/api/affiliations/:id` | Archive affiliation |
+| GET | `/nbi/affiliations` | List affiliations |
+| GET | `/nbi/affiliations/:id` | Fetch one affiliation |
+| POST | `/nbi/affiliations` | Create affiliation |
+| PUT | `/nbi/affiliations/:id` | Update affiliation |
+| DELETE | `/nbi/affiliations/:id` | Archive affiliation |
 
 Officers:
 
 | Method | Path | Description |
 | --- | --- | --- |
-| GET | `/api/officers` | List officers |
-| GET | `/api/officers/:id` | Fetch one officer |
-| POST | `/api/officers` | Create officer |
-| PUT | `/api/officers/:id` | Update officer |
-| DELETE | `/api/officers/:id` | Archive officer |
+| GET | `/nbi/officers` | List officers |
+| GET | `/nbi/officers/:id` | Fetch one officer |
+| POST | `/nbi/officers` | Create officer |
+| PUT | `/nbi/officers/:id` | Update officer |
+| DELETE | `/nbi/officers/:id` | Archive officer |
 
 Races:
 
 | Method | Path | Description |
 | --- | --- | --- |
-| GET | `/api/races` | List races |
-| GET | `/api/races/:id` | Fetch one race |
-| POST | `/api/races` | Create race |
-| PUT | `/api/races/:id` | Update race |
-| DELETE | `/api/races/:id` | Archive race |
+| GET | `/nbi/races` | List races |
+| GET | `/nbi/races/:id` | Fetch one race |
+| POST | `/nbi/races` | Create race |
+| PUT | `/nbi/races/:id` | Update race |
+| DELETE | `/nbi/races/:id` | Archive race |
 
 Race entries:
 
 | Method | Path | Description |
 | --- | --- | --- |
-| GET | `/api/race-entries` | List race entries |
-| GET | `/api/race-entries/:id` | Fetch one race entry |
-| POST | `/api/race-entries` | Book a race entry |
-| PUT | `/api/race-entries/:id` | Update race entry |
-| PUT | `/api/race-entries/:id/check-in` | Check in a race entry |
-| PUT | `/api/race-entries/:id/boarding` | Board a race entry |
-| PUT | `/api/race-entries/:id/departure` | Mark race entry departed |
-| PUT | `/api/race-entries/:id/arrival` | Record arrival and recalculate ranks |
-| DELETE | `/api/race-entries/:id` | Archive race entry |
+| GET | `/nbi/race-entries` | List race entries |
+| GET | `/nbi/race-entries/:id` | Fetch one race entry |
+| POST | `/nbi/race-entries` | Book a race entry |
+| PUT | `/nbi/race-entries/:id` | Update race entry |
+| PUT | `/nbi/race-entries/:id/check-in` | Check in a race entry |
+| PUT | `/nbi/race-entries/:id/boarding` | Board a race entry |
+| PUT | `/nbi/race-entries/:id/departure` | Mark race entry departed |
+| PUT | `/nbi/race-entries/:id/arrival` | Record arrival and recalculate ranks |
+| DELETE | `/nbi/race-entries/:id` | Archive race entry |
+
+Commerce:
+
+| Method | Path | Description |
+| --- | --- | --- |
+| GET | `/nbi/commerce` | Commerce module summary |
+| GET | `/nbi/commerce/wallets` | List commerce wallets |
+| GET | `/nbi/commerce/wallets/:walletId` | Fetch one commerce wallet |
+| POST | `/nbi/commerce/wallets` | Create coordinator or fancier wallet |
+| PUT | `/nbi/commerce/wallets/:walletId/preload` | Preload wallet balance |
+| PUT | `/nbi/commerce/wallets/:walletId/transfer` | Transfer load between wallets |
+| PUT | `/nbi/commerce/wallets/:walletId/fees/bird-registration` | Charge bird registration fee |
+| PUT | `/nbi/commerce/wallets/:walletId/fees/race` | Charge race fee |
+| POST | `/nbi/commerce/wallets/:walletId/recharge-requests` | Create recharge request |
+| PUT | `/nbi/commerce/wallets/:walletId/recharge-requests/:transactionId/approve` | Approve recharge request |
+| PUT | `/nbi/commerce/wallets/:walletId/recharge-requests/:transactionId/reject` | Reject recharge request |
+| GET | `/nbi/commerce/fee-profiles` | List fee profiles |
+| POST | `/nbi/commerce/fee-profiles` | Save fee profile by club and fee type |
+| GET | `/nbi/commerce/receipts` | List issued receipts |
+| GET | `/nbi/commerce/receipts/:receiptId` | Fetch one receipt |
 
 ## Racing Model Notes
 

@@ -5,16 +5,18 @@ import cors from "cors";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import authRouter from "./routes/auth.js";
+import commerceRouter from "./commerce/routes.js";
 import affiliationsRouter from "./routes/affiliations.js";
 import clubsRouter from "./routes/clubs.js";
 import cratesRouter from "./routes/crates.js";
 import loftsRouter from "./routes/lofts.js";
 import officersRouter from "./routes/officers.js";
-import pigeonsRouter from "./routes/pigeons.js";
+import birdsRouter from "./routes/birds.js";
 import raceEntriesRouter from "./routes/raceEntries.js";
 import racesRouter from "./routes/races.js";
-import { apiRoutes, logApiRoutes } from "./routes/index.js";
+import { nbiRoutes, logNbiRoutes } from "./routes/index.js";
 import usersRouter from "./routes/users.js";
+import walletsRouter from "./routes/wallets.js";
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -28,43 +30,72 @@ const MONGO_URI = process.env.MONGO_URI;
 app.use(cors());
 app.use(express.json());
 
+app.use("/nbi/auth", authRouter);
+app.use("/nbi/commerce", commerceRouter);
+app.use("/nbi/affiliations", affiliationsRouter);
+app.use("/nbi/clubs", clubsRouter);
+app.use("/nbi/crates", cratesRouter);
+app.use("/nbi/lofts", loftsRouter);
+app.use("/nbi/officers", officersRouter);
+app.use("/nbi/birds", birdsRouter);
+app.use("/nbi/pigeons", birdsRouter);
+app.use("/nbi/pegions", birdsRouter);
+app.use("/nbi/race-entries", raceEntriesRouter);
+app.use("/nbi/races", racesRouter);
+app.use("/nbi/users", usersRouter);
+app.use("/nbi/wallets", walletsRouter);
+
+// Legacy aliases kept during route transition.
 app.use("/api/auth", authRouter);
+app.use("/api/commerce", commerceRouter);
 app.use("/api/affiliations", affiliationsRouter);
 app.use("/api/clubs", clubsRouter);
 app.use("/api/crates", cratesRouter);
 app.use("/api/lofts", loftsRouter);
 app.use("/api/officers", officersRouter);
-app.use("/api/pigeons", pigeonsRouter);
-app.use("/api/pegions", pigeonsRouter);
+app.use("/api/birds", birdsRouter);
+app.use("/api/pigeons", birdsRouter);
+app.use("/api/pegions", birdsRouter);
 app.use("/api/race-entries", raceEntriesRouter);
 app.use("/api/races", racesRouter);
 app.use("/api/users", usersRouter);
+app.use("/api/wallets", walletsRouter);
+
+app.get("/nbi/routes", (req, res) => {
+  res.json({
+    success: "NBI routes fetched successfully",
+    payload: nbiRoutes,
+  });
+});
 
 app.get("/api/routes", (req, res) => {
   res.json({
-    success: "API routes fetched successfully",
-    payload: apiRoutes,
+    success: "Legacy API routes fetched successfully",
+    payload: nbiRoutes,
   });
 });
 
 // test route
 app.get("/", (req, res) => {
   res.json({
-    success: "AgilaTrack API running",
+    success: "AgilaTrack NBI running",
     endpoints: {
-      affiliations: "/api/affiliations",
-      auth: "/api/auth/login",
-      clubs: "/api/clubs",
-      crates: "/api/crates",
-      clubPyramid: "/api/clubs/pyramid",
-      clubLevels: "/api/clubs/meta/levels",
-      lofts: "/api/lofts",
-      officers: "/api/officers",
-      pigeons: "/api/pigeons",
-      raceEntries: "/api/race-entries",
-      races: "/api/races",
-      routes: "/api/routes",
-      users: "/api/users",
+      affiliations: "/nbi/affiliations",
+      auth: "/nbi/auth/login",
+      commerce: "/nbi/commerce",
+      clubs: "/nbi/clubs",
+      crates: "/nbi/crates",
+      clubPyramid: "/nbi/clubs/pyramid",
+      clubLevels: "/nbi/clubs/meta/levels",
+      lofts: "/nbi/lofts",
+      officers: "/nbi/officers",
+      birds: "/nbi/birds",
+      pigeons: "/nbi/pigeons",
+      raceEntries: "/nbi/race-entries",
+      races: "/nbi/races",
+      routes: "/nbi/routes",
+      users: "/nbi/users",
+      wallets: "/nbi/wallets",
     },
   });
 });
@@ -125,7 +156,7 @@ if (!MONGO_URI) {
   process.exit(1);
 }
 
-logApiRoutes();
+logNbiRoutes();
 
 // connect mongo
 mongoose

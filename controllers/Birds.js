@@ -1,9 +1,9 @@
-import Pigeons from "../models/Pigeons.js";
+import Birds from "../models/Birds.js";
 
 const sendError = (res, error, status = 400) =>
   res.status(status).json({ error: error.message || error });
 
-const populatePigeon = (query) =>
+const populateBird = (query) =>
   query
     .populate("club", "name code abbr level location")
     .populate("owner", "fullName email mobile pid")
@@ -21,7 +21,7 @@ const populatePigeon = (query) =>
     .populate("parents.dam.pigeon", "bandNumber name sex color strain status")
     .populate("healthRecords.administeredBy", "fullName email mobile pid");
 
-const buildPigeonQuery = (query = {}) => {
+const buildBirdQuery = (query = {}) => {
   const {
     affiliation,
     bandNumber,
@@ -54,13 +54,11 @@ const buildPigeonQuery = (query = {}) => {
 
 export const findAll = async (req, res) => {
   try {
-    const payload = await populatePigeon(
-      Pigeons.find(buildPigeonQuery(req.query)),
-    )
+    const payload = await populateBird(Birds.find(buildBirdQuery(req.query)))
       .sort({ createdAt: -1 })
       .lean({ virtuals: true });
 
-    res.json({ success: "Pigeons fetched successfully", payload });
+    res.json({ success: "Birds fetched successfully", payload });
   } catch (error) {
     sendError(res, error);
   }
@@ -68,62 +66,62 @@ export const findAll = async (req, res) => {
 
 export const findOne = async (req, res) => {
   try {
-    const payload = await populatePigeon(Pigeons.findById(req.params.id)).lean({
+    const payload = await populateBird(Birds.findById(req.params.id)).lean({
       virtuals: true,
     });
 
-    if (!payload) return res.status(404).json({ error: "Pigeon not found" });
+    if (!payload) return res.status(404).json({ error: "Bird not found" });
 
-    res.json({ success: "Pigeon fetched successfully", payload });
+    res.json({ success: "Bird fetched successfully", payload });
   } catch (error) {
     sendError(res, error);
   }
 };
 
-export const createPigeon = async (req, res) => {
+export const createBird = async (req, res) => {
   try {
-    const created = await Pigeons.create(req.body);
-    const payload = await populatePigeon(Pigeons.findById(created._id)).lean({
+    const created = await Birds.create(req.body);
+    const payload = await populateBird(Birds.findById(created._id)).lean({
       virtuals: true,
     });
 
-    res.status(201).json({ success: "Pigeon created successfully", payload });
+    res.status(201).json({ success: "Bird created successfully", payload });
   } catch (error) {
     sendError(res, error);
   }
 };
 
-export const updatePigeon = async (req, res) => {
+export const updateBird = async (req, res) => {
   try {
-    const pigeon = await Pigeons.findById(req.params.id);
-    if (!pigeon) return res.status(404).json({ error: "Pigeon not found" });
+    const bird = await Birds.findById(req.params.id);
+    if (!bird) return res.status(404).json({ error: "Bird not found" });
 
-    pigeon.set(req.body);
-    await pigeon.save();
+    bird.set(req.body);
+    await bird.save();
 
-    const payload = await populatePigeon(Pigeons.findById(pigeon._id)).lean({
+    const payload = await populateBird(Birds.findById(bird._id)).lean({
       virtuals: true,
     });
 
-    res.json({ success: "Pigeon updated successfully", payload });
+    res.json({ success: "Bird updated successfully", payload });
   } catch (error) {
     sendError(res, error);
   }
 };
 
-export const deletePigeon = async (req, res) => {
+export const deleteBird = async (req, res) => {
   try {
-    const payload = await populatePigeon(
-      Pigeons.findByIdAndUpdate(
+    const payload = await populateBird(
+      Birds.findByIdAndUpdate(
         req.params.id,
         { deletedAt: new Date().toISOString(), status: "archived" },
         { new: true },
       ),
     ).lean({ virtuals: true });
 
-    if (!payload) return res.status(404).json({ error: "Pigeon not found" });
+    if (!payload) return res.status(404).json({ error: "Bird not found" });
 
-    res.json({ success: "Pigeon archived successfully", payload });
+    res.json({ success: "Bird archived successfully", payload });
   } catch (error) {
     sendError(res, error);
   }
