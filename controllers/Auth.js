@@ -3,7 +3,7 @@ import Users from "../models/Users.js";
 import Affiliations from "../models/Affiliations.js";
 
 const USER_SELECT =
-  "_id email fullName activePlatform membership state mobile isActive createdAt updatedAt";
+  "_id email username fullName activePlatform membership state mobile isActive createdAt updatedAt pid profilePhoto validIdImage profile";
 
 const sendInvalidCredentials = (res) =>
   res.status(401).json({ error: "Invalid email or password" });

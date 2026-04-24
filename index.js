@@ -1,34 +1,32 @@
 import express from "express";
-import mongoose from "mongoose";
-import dotenv from "dotenv";
 import cors from "cors";
-import path from "node:path";
 import dns from "node:dns";
-import { fileURLToPath } from "node:url";
 import authRouter from "./routes/auth.js";
 import affiliationsRouter from "./routes/affiliations.js";
 import clubsRouter from "./routes/clubs.js";
+import { getAllowedOrigins, corsOptions } from "./config/cors.js";
+import { getCloudinaryStatus } from "./config/cloudinary.js";
+import { connectDatabase, logMongoStartupError } from "./config/database.js";
+import { env } from "./config/env.js";
 import cratesRouter from "./routes/crates.js";
 import loftsRouter from "./routes/lofts.js";
+import { errorHandler, notFoundHandler } from "./middleware/errorHandler.js";
 import officersRouter from "./routes/officers.js";
 import pigeonsRouter from "./routes/pigeons.js";
 import raceEntriesRouter from "./routes/raceEntries.js";
 import racesRouter from "./routes/races.js";
+import uploadRouter from "./routes/upload.js";
 import { apiRoutes, logApiRoutes } from "./routes/index.js";
 import usersRouter from "./routes/users.js";
 
-const __filename = fileURLToPath(import.meta.url);
-const __dirname = path.dirname(__filename);
-
-dotenv.config({ path: path.join(__dirname, ".env"), quiet: true });
 dns.setServers(["1.1.1.1", "8.8.8.8"]);
 
 const app = express();
-const PORT = process.env.PORT || 5000;
-const MONGO_URI = process.env.MONGO_URI;
+const PORT = env.PORT;
 
-app.use(cors());
+app.use(cors(corsOptions));
 app.use(express.json());
+app.use(express.urlencoded({ extended: true }));
 
 app.use("/api/auth", authRouter);
 app.use("/api/affiliations", affiliationsRouter);
@@ -40,6 +38,7 @@ app.use("/api/pigeons", pigeonsRouter);
 app.use("/api/pegions", pigeonsRouter);
 app.use("/api/race-entries", raceEntriesRouter);
 app.use("/api/races", racesRouter);
+app.use("/api/upload", uploadRouter);
 app.use("/api/users", usersRouter);
 
 app.get("/api/routes", (req, res) => {
@@ -49,10 +48,13 @@ app.get("/api/routes", (req, res) => {
   });
 });
 
-// test route
 app.get("/", (req, res) => {
   res.json({
     success: "AgilaTrack API running",
+    cors: {
+      allowedOrigins: getAllowedOrigins(),
+    },
+    cloudinary: getCloudinaryStatus(),
     endpoints: {
       affiliations: "/api/affiliations",
       auth: "/api/auth/login",
@@ -66,80 +68,39 @@ app.get("/", (req, res) => {
       raceEntries: "/api/race-entries",
       races: "/api/races",
       routes: "/api/routes",
+      upload: "/api/upload/profile-photo",
       users: "/api/users",
     },
   });
 });
 
-const getMongoConnectionSummary = (uri) => {
-  try {
-    const parsed = new URL(uri);
-
-    return {
-      user: parsed.username || "(missing)",
-      host: parsed.host || "(missing)",
-      database: parsed.pathname.replace("/", "") || "(none)",
-      authSource: parsed.searchParams.get("authSource") || "(default)",
-    };
-  } catch {
-    return null;
-  }
-};
-
-const logMongoStartupError = (error) => {
-  if (
-    error?.name === "MongooseServerSelectionError" ||
-    /querySrv|ENOTFOUND|ETIMEDOUT|ECONNREFUSED|IP address/i.test(error?.message || "")
-  ) {
-    const summary = getMongoConnectionSummary(MONGO_URI);
-
-    console.error("MongoDB connection could not be reached.");
-    if (summary) {
-      console.error(`Trying to connect to "${summary.host}" as "${summary.user}".`);
-    }
-    console.error(`Original error: ${error.message || error}`);
-    console.error(
-      "Check your internet connection, MongoDB Atlas Network Access IP whitelist, and the MONGO_URI value in server/.env.",
-    );
-    return;
-  }
-
-  if (error?.codeName === "AtlasError" && /bad auth/i.test(error.message)) {
-    const summary = getMongoConnectionSummary(MONGO_URI);
-    const hasAtlasAuthShape = summary?.database !== "(none)" && summary?.authSource === "admin";
-
-    console.error("MongoDB authentication failed.");
-    if (summary) {
-      console.error(
-        `Using user "${summary.user}" on "${summary.host}", database "${summary.database}", authSource "${summary.authSource}".`,
-      );
-    }
-    console.error(
-      hasAtlasAuthShape
-        ? "Atlas is reachable, but it rejected the database user's credentials. Reset the Atlas Database Access password, update MONGO_URI, and URL-encode any special characters in the password."
-        : "Check the Atlas database user's username/password, make sure special characters in the password are URL-encoded, and add a database path with authSource=admin to MONGO_URI if the user was created in Atlas.",
-    );
-    return;
-  }
-
-  console.error("MongoDB connection failed:", error.message || error);
-};
-
-if (!MONGO_URI) {
-  console.error("MONGO_URI is missing. Add it to server/.env.");
-  process.exit(1);
-}
-
 logApiRoutes();
+console.log("Cloudinary status:", getCloudinaryStatus());
 
-// connect mongo
-mongoose
-  .connect(MONGO_URI)
+process.on("unhandledRejection", (err) => {
+  console.error("Unhandled Rejection:", err);
+});
+
+process.on("uncaughtException", (err) => {
+  console.error("Uncaught Exception:", err);
+});
+
+app.use(notFoundHandler);
+app.use(errorHandler);
+
+connectDatabase()
   .then(() => {
-    console.log("Mongo connected");
+    const server = app.listen(PORT, "0.0.0.0", () => {
+      console.log(`Server running on http://0.0.0.0:${PORT}`);
+    });
 
-    app.listen(PORT, () => {
-      console.log(`Server running on ${PORT}`);
+    server.on("error", (err) => {
+      console.error("Server error:", err.message, err);
+    });
+
+    server.on("listening", () => {
+      console.log("Server is listening");
+      console.log("Bound to:", server.address());
     });
   })
   .catch((err) => {

@@ -5,6 +5,24 @@ const USER_SELECT = "-password -__v";
 const sendError = (res, error, status = 400) =>
   res.status(status).json({ error: error.message || error });
 
+const sendCreateOrUpdateError = (res, error) => {
+  if (error?.code === 11000) {
+    const duplicateField = Object.keys(error.keyPattern || {})[0] || "field";
+    const fieldLabel =
+      duplicateField === "email"
+        ? "Email"
+        : duplicateField === "username"
+          ? "Username"
+          : "Value";
+
+    return res.status(409).json({
+      error: `${fieldLabel} is already in use.`,
+    });
+  }
+
+  return sendError(res, error);
+};
+
 const buildUserQuery = (query = {}) => {
   const {
     email,
@@ -75,7 +93,7 @@ export const createUser = async (req, res) => {
 
     res.status(201).json({ success: "User created successfully", payload });
   } catch (error) {
-    sendError(res, error);
+    sendCreateOrUpdateError(res, error);
   }
 };
 
@@ -93,7 +111,7 @@ export const updateUser = async (req, res) => {
 
     res.json({ success: "User updated successfully", payload });
   } catch (error) {
-    sendError(res, error);
+    sendCreateOrUpdateError(res, error);
   }
 };
 

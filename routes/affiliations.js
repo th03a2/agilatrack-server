@@ -1,17 +1,25 @@
 import express from "express";
 import {
+  approveAffiliation,
+  assignAffiliationRole,
   createAffiliation,
   deleteAffiliation,
+  findClubDashboard,
   findAll,
   findOne,
+  rejectAffiliation,
   updateAffiliation,
 } from "../controllers/Affiliations.js";
 
 const router = express.Router();
 
 router.get("/", findAll);
+router.get("/club-dashboard/:clubId", findClubDashboard);
 router.get("/:id", findOne);
 router.post("/", createAffiliation);
+router.put("/:id/approve", approveAffiliation);
+router.put("/:id/reject", rejectAffiliation);
+router.put("/:id/assign-role", assignAffiliationRole);
 router.put("/:id", updateAffiliation);
 router.delete("/:id", deleteAffiliation);
 

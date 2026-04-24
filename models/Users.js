@@ -37,6 +37,8 @@ const userSchema = new Schema(
   {
     //Profile ID in Cloudinary
     pid: { type: String },
+    profilePhoto: { type: String, trim: true },
+    validIdImage: { type: String, trim: true },
     profile: {
       status: {
         type: String,
@@ -56,6 +58,13 @@ const userSchema = new Schema(
     email: {
       type: String,
       unique: true,
+    },
+    username: {
+      type: String,
+      trim: true,
+      lowercase: true,
+      unique: true,
+      sparse: true,
     },
     password: {
       type: String,

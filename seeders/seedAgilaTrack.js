@@ -266,10 +266,11 @@ const userSeeds = [
   },
   {
     key: "maria",
-    clubKey: "indang",
-    loftKey: "delaCruzNorth",
-    officer: "Secretary",
     email: "maria.santos@agilatrack.test",
+    membership: "guest",
+    state: ["guest"],
+    workTitle: "Guest User",
+    workCompany: "AgilaTrack Guest Portal",
     fullName: {
       fname: "Maria",
       mname: "Reyes",
@@ -535,7 +536,7 @@ const raceSeeds = [
       location: "Indang Flyers Clubhouse Crate Area",
     },
     transport: {
-      handlerKey: "maria",
+      handlerKey: "ana",
       transporterKey: "juan",
       driver: {
         name: "Juan Dela Cruz",
@@ -561,7 +562,7 @@ const raceSeeds = [
     liberation: {
       liberatorKey: "juan",
       releasedByName: "Juan Dela Cruz",
-      witnesses: [{ userKey: "maria", role: "Secretary" }],
+      witnesses: [{ userKey: "ana", role: "Race Secretary" }],
     },
     weather: {
       condition: "Pending race-day check",
@@ -621,8 +622,8 @@ const raceEntrySeeds = [
   },
   {
     raceKey: "indangTarlac100",
-    userKey: "maria",
-    loftKey: "delaCruzNorth",
+    userKey: "ana",
+    loftKey: "lopezSky",
     bird: {
       bandNumber: "IFC-2024-0002",
       name: "Mabini Line",
@@ -720,7 +721,6 @@ const roleByOfficer = {
 
 const memberCodeByUserKey = {
   juan: "IFC-0001",
-  maria: "IFC-0002",
   pedro: "IFC-0003",
   ana: "IFC-0004",
   carlo: "SHFC-0001",
@@ -770,8 +770,8 @@ const upsertUser = async (seed) => {
     password: defaultPassword,
     fullName: seed.fullName,
     mobile: seed.mobile,
-    membership: "regular",
-    state: ["patron"],
+    membership: seed.membership || "regular",
+    state: seed.state || ["patron"],
     isMale: seed.isMale,
     profile: {
       status: "approved",
@@ -786,8 +786,10 @@ const upsertUser = async (seed) => {
       zip: place.zip,
     },
     work: {
-      title: seed.officer || "Racer",
-      company: `${seed.clubKey} racing club`,
+      title: seed.workTitle || seed.officer || "Racer",
+      company:
+        seed.workCompany ||
+        (seed.clubKey ? `${seed.clubKey} racing club` : "AgilaTrack Guest Portal"),
       province: place.province,
       createdAt: new Date(),
     },
@@ -1043,7 +1045,7 @@ const seed = async () => {
 
   const affiliations = [];
   const affiliationsByUserKey = {};
-  for (const userSeed of userSeeds) {
+  for (const userSeed of userSeeds.filter((seed) => seed.clubKey && seed.loftKey)) {
     const affiliation = await upsertAffiliation({
       userSeed,
       usersByKey,
@@ -1063,11 +1065,10 @@ const seed = async () => {
   const indangClub = clubsByKey.indang;
   indangClub.leadership = {
     president: { user: usersByKey.juan._id },
-    secretary: { user: usersByKey.maria._id },
     treasurer: { user: usersByKey.pedro._id },
     officers: [{ position: "Race Secretary", user: usersByKey.ana._id }],
   };
-  indangClub.contacts = usersByKey.maria._id;
+  indangClub.contacts = usersByKey.juan._id;
   await indangClub.save();
 
   const racesByKey = {};

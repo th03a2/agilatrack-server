@@ -79,6 +79,10 @@ const modelSchema = new Schema(
       trim: true,
       maxlength: 80,
     },
+    birdImage: {
+      type: String,
+      trim: true,
+    },
     sex: {
       type: String,
       enum: PIGEON_SEXES,

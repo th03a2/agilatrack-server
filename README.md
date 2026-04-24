@@ -68,7 +68,7 @@ Password123!
 | Email | Name | Club | Officer Role |
 | --- | --- | --- | --- |
 | `juan.delacruz@agilatrack.test` | Juan Dela Cruz | Indang Flyers Club | President |
-| `maria.santos@agilatrack.test` | Maria Santos | Indang Flyers Club | Secretary |
+| `maria.santos@agilatrack.test` | Maria Santos | Guest Portal | Guest |
 | `pedro.ramos@agilatrack.test` | Pedro Ramos | Indang Flyers Club | Treasurer |
 | `ana.lopez@agilatrack.test` | Ana Lopez | Indang Flyers Club | Race Secretary |
 | `carlo.mendoza@agilatrack.test` | Carlo Mendoza | Silang High Flyers Club | President |

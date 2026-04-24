@@ -18,6 +18,7 @@ export const CLUB_PARENT_LEVEL = {
 const modelSchema = new Schema(
   {
     name: { type: String, required: true, trim: true },
+    clubLogo: { type: String, trim: true },
     code: {
       type: String,
       required: true,
