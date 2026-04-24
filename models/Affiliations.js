@@ -78,7 +78,13 @@ const modelSchema = new Schema(
       trim: true,
       lowercase: true,
     },
-    roles: [{ type: Number }],
+    roles: [
+      {
+        type: String,
+        trim: true,
+        lowercase: true,
+      },
+    ],
     mobile: { type: String },
     primaryLoft: {
       type: Schema.Types.ObjectId,

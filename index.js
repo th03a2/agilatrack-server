@@ -30,6 +30,21 @@ const MONGO_URI = process.env.MONGO_URI;
 app.use(cors());
 app.use(express.json());
 
+app.use((error, req, res, next) => {
+  if (
+    error instanceof SyntaxError &&
+    "body" in error &&
+    /JSON/i.test(error.message || "")
+  ) {
+    return res.status(400).json({
+      error: "Invalid JSON payload",
+      message: "Request body contains malformed JSON.",
+    });
+  }
+
+  return next(error);
+});
+
 app.use("/nbi/auth", authRouter);
 app.use("/nbi/commerce", commerceRouter);
 app.use("/nbi/affiliations", affiliationsRouter);
