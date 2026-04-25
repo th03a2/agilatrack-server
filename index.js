@@ -91,28 +91,33 @@ app.get("/api/routes", (req, res) => {
 });
 
 // test route
-app.get("/", (req, res) => {
-  res.json({
-    success: "AgilaTrack NBI running",
-    endpoints: {
-      affiliations: "/nbi/affiliations",
-      auth: "/nbi/auth/login",
-      commerce: "/nbi/commerce",
-      clubs: "/nbi/clubs",
-      crates: "/nbi/crates",
-      clubPyramid: "/nbi/clubs/pyramid",
-      clubLevels: "/nbi/clubs/meta/levels",
-      lofts: "/nbi/lofts",
-      officers: "/nbi/officers",
-      birds: "/nbi/birds",
-      pigeons: "/nbi/pigeons",
-      raceEntries: "/nbi/race-entries",
-      races: "/nbi/races",
-      routes: "/nbi/routes",
-      users: "/nbi/users",
-      wallets: "/nbi/wallets",
-    },
-  });
+// app.get("/", (req, res) => {
+//   res.json({
+//     success: "AgilaTrack NBI running",
+//     endpoints: {
+//       affiliations: "/nbi/affiliations",
+//       auth: "/nbi/auth/login",
+//       commerce: "/nbi/commerce",
+//       clubs: "/nbi/clubs",
+//       crates: "/nbi/crates",
+//       clubPyramid: "/nbi/clubs/pyramid",
+//       clubLevels: "/nbi/clubs/meta/levels",
+//       lofts: "/nbi/lofts",
+//       officers: "/nbi/officers",
+//       birds: "/nbi/birds",
+//       pigeons: "/nbi/pigeons",
+//       raceEntries: "/nbi/race-entries",
+//       races: "/nbi/races",
+//       routes: "/nbi/routes",
+//       users: "/nbi/users",
+//       wallets: "/nbi/wallets",
+//     },
+//   });
+// });
+app.use(express.static(path.join(__dirname, "view")));
+
+app.get(/.*/, (_, res) => {
+  res.sendFile(path.join(__dirname, "view", "index.html"));
 });
 
 const getMongoConnectionSummary = (uri) => {
@@ -133,13 +138,17 @@ const getMongoConnectionSummary = (uri) => {
 const logMongoStartupError = (error) => {
   if (
     error?.name === "MongooseServerSelectionError" ||
-    /querySrv|ENOTFOUND|ETIMEDOUT|ECONNREFUSED|IP address/i.test(error?.message || "")
+    /querySrv|ENOTFOUND|ETIMEDOUT|ECONNREFUSED|IP address/i.test(
+      error?.message || "",
+    )
   ) {
     const summary = getMongoConnectionSummary(MONGO_URI);
 
     console.error("MongoDB connection could not be reached.");
     if (summary) {
-      console.error(`Trying to connect to "${summary.host}" as "${summary.user}".`);
+      console.error(
+        `Trying to connect to "${summary.host}" as "${summary.user}".`,
+      );
     }
     console.error(`Original error: ${error.message || error}`);
     console.error(
