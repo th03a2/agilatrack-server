@@ -46,7 +46,7 @@ export const login = async (req, res) => {
 
     res.json({
       success: "Login successful",
-      payload: {
+      data: {
         user: payload,
         affiliations,
         token: crypto.randomBytes(32).toString("hex"),
