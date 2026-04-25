@@ -4,11 +4,25 @@ Express and MongoDB API for AgilaTrack club, loft, affiliation, officer, and rac
 
 ## Setup
 
-Create `server/.env` from the example file:
+Copy `server/.env.example` to `server/.env`. The real `.env` file is local-only and must never be committed to Git:
+
+```bash
+cp .env.example .env
+```
+
+On PowerShell, you can use:
+
+```powershell
+Copy-Item .env.example .env
+```
+
+Then fill in your local values:
 
 ```env
 PORT=5000
 MONGO_URI=mongodb+srv://<username>:<password>@<cluster-host>/racingHub?retryWrites=true&w=majority&authSource=admin&appName=AgilaTracker
+JWT_SECRET=<your-local-jwt-secret>
+CLIENT_URL=http://localhost:5173
 ```
 
 Install dependencies and run the API:
@@ -29,6 +43,7 @@ For teammates cloning the project:
 If the backend works on one computer but not another, the most common causes are:
 
 - `server/.env` is missing because `.env` is intentionally ignored by Git.
+- `server/.env` was replaced locally with stale Atlas credentials and needs to be restored from the correct project or cluster.
 - The teammate's IP address is not allowed in MongoDB Atlas Network Access.
 - The Atlas database username or password is different from the connection string.
 - Port `5000` is already in use on their machine.
