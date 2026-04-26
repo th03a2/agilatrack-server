@@ -7,6 +7,7 @@ import { fileURLToPath } from "node:url";
 import authRouter from "./routes/auth.js";
 import commerceRouter from "./commerce/routes.js";
 import affiliationsRouter from "./routes/affiliations.js";
+import clubManagementRouter from "./routes/clubManagement.js";
 import clubsRouter from "./routes/clubs.js";
 import cratesRouter from "./routes/crates.js";
 import loftsRouter from "./routes/lofts.js";
@@ -48,6 +49,7 @@ app.use((error, req, res, next) => {
 app.use("/nbi/auth", authRouter);
 app.use("/nbi/commerce", commerceRouter);
 app.use("/nbi/affiliations", affiliationsRouter);
+app.use("/nbi/club-management", clubManagementRouter);
 app.use("/nbi/clubs", clubsRouter);
 app.use("/nbi/crates", cratesRouter);
 app.use("/nbi/lofts", loftsRouter);
@@ -64,6 +66,7 @@ app.use("/nbi/wallets", walletsRouter);
 app.use("/api/auth", authRouter);
 app.use("/api/commerce", commerceRouter);
 app.use("/api/affiliations", affiliationsRouter);
+app.use("/api/club-management", clubManagementRouter);
 app.use("/api/clubs", clubsRouter);
 app.use("/api/crates", cratesRouter);
 app.use("/api/lofts", loftsRouter);
@@ -97,13 +100,14 @@ app.get("/", (req, res) => {
     endpoints: {
       affiliations: "/nbi/affiliations",
       auth: "/nbi/auth/login",
+      clubManagement: "/nbi/club-management",
       commerce: "/nbi/commerce",
       clubs: "/nbi/clubs",
       crates: "/nbi/crates",
       clubPyramid: "/nbi/clubs/pyramid",
       clubLevels: "/nbi/clubs/meta/levels",
       lofts: "/nbi/lofts",
-      officers: "/nbi/officers",
+      officers: "/nbi/officers (legacy alias)",
       birds: "/nbi/birds",
       pigeons: "/nbi/pigeons",
       raceEntries: "/nbi/race-entries",

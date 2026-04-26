@@ -3,9 +3,9 @@ import mongoose from "mongoose";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import Affiliations from "../models/Affiliations.js";
+import ClubManagement from "../models/ClubManagement.js";
 import Clubs from "../models/Clubs.js";
 import Lofts from "../models/Lofts.js";
-import Officers from "../models/Officers.js";
 import RaceEntries from "../models/RaceEntries.js";
 import Races from "../models/Races.js";
 import Users from "../models/Users.js";
@@ -20,62 +20,80 @@ const shouldReset = process.argv.includes("--reset");
 const defaultPassword = "Password123!";
 
 const places = {
-  indang: {
-    region: "CALABARZON",
-    regionCode: "R4A",
-    province: "Cavite",
-    provinceCode: "CAV",
-    municipality: "Indang",
-    municipalityCode: "IND",
-    barangay: "Poblacion IV",
-    barangayCode: "1023",
-    zip: "4122",
-  },
-  silang: {
-    region: "CALABARZON",
-    regionCode: "R4A",
-    province: "Cavite",
-    provinceCode: "CAV",
-    municipality: "Silang",
-    municipalityCode: "SIL",
-    barangay: "Biga I",
-    barangayCode: "1031",
-    zip: "4118",
-  },
-  calamba: {
-    region: "CALABARZON",
-    regionCode: "R4A",
-    province: "Laguna",
-    provinceCode: "LAG",
-    municipality: "Calamba",
-    municipalityCode: "CAL",
-    barangay: "Real",
-    barangayCode: "1104",
-    zip: "4027",
-  },
-  tarlacCity: {
+  cabanatuan: {
     region: "Central Luzon",
     regionCode: "R3",
-    province: "Tarlac",
-    provinceCode: "TAR",
-    municipality: "Tarlac City",
-    municipalityCode: "TAC",
-    barangay: "San Roque",
-    barangayCode: "0301",
-    zip: "2300",
+    province: "Nueva Ecija",
+    provinceCode: "NUE",
+    municipality: "Cabanatuan City",
+    municipalityCode: "CAB",
+    barangay: "Sangitan East",
+    barangayCode: "1001",
+    zip: "3100",
+  },
+  gapan: {
+    region: "Central Luzon",
+    regionCode: "R3",
+    province: "Nueva Ecija",
+    provinceCode: "NUE",
+    municipality: "Gapan City",
+    municipalityCode: "GAP",
+    barangay: "San Vicente",
+    barangayCode: "1002",
+    zip: "3105",
+  },
+  sanJose: {
+    region: "Central Luzon",
+    regionCode: "R3",
+    province: "Nueva Ecija",
+    provinceCode: "NUE",
+    municipality: "San Jose City",
+    municipalityCode: "SJC",
+    barangay: "Abar 1st",
+    barangayCode: "1003",
+    zip: "3121",
+  },
+  talavera: {
+    region: "Central Luzon",
+    regionCode: "R3",
+    province: "Nueva Ecija",
+    provinceCode: "NUE",
+    municipality: "Talavera",
+    municipalityCode: "TAL",
+    barangay: "Sampaloc",
+    barangayCode: "1004",
+    zip: "3114",
+  },
+  guimba: {
+    region: "Central Luzon",
+    regionCode: "R3",
+    province: "Nueva Ecija",
+    provinceCode: "NUE",
+    municipality: "Guimba",
+    municipalityCode: "GUI",
+    barangay: "Saranay District",
+    barangayCode: "1005",
+    zip: "3115",
+  },
+  cabiao: {
+    region: "Central Luzon",
+    regionCode: "R3",
+    province: "Nueva Ecija",
+    provinceCode: "NUE",
+    municipality: "Cabiao",
+    municipalityCode: "CBI",
+    barangay: "Bagong Sikat",
+    barangayCode: "1006",
+    zip: "3107",
   },
 };
 
 const addressFromPlace = (place, street) => ({
   street,
   barangay: place.barangay,
-  barangayCode: place.barangayCode,
-  municipality: place.municipality,
-  municipalityCode: place.municipalityCode,
+  city: place.municipality,
   province: place.province,
-  provinceCode: place.provinceCode,
   region: place.region,
-  regionCode: place.regionCode,
   zip: place.zip,
 });
 
@@ -93,19 +111,6 @@ const clubSeeds = [
       "National sample federation for AgilaTrack development and QA workflows.",
   },
   {
-    key: "calabarzon",
-    parentKey: "national",
-    name: "CALABARZON Racing Pigeon Council",
-    code: "PH-R4A",
-    abbr: "CRPC",
-    level: "regional",
-    location: {
-      region: places.indang.region,
-      regionCode: places.indang.regionCode,
-    },
-    status: "approved",
-  },
-  {
     key: "centralLuzon",
     parentKey: "national",
     name: "Central Luzon Racing Pigeon Council",
@@ -113,131 +118,139 @@ const clubSeeds = [
     abbr: "CLRPC",
     level: "regional",
     location: {
-      region: places.tarlacCity.region,
-      regionCode: places.tarlacCity.regionCode,
+      region: places.talavera.region,
+      regionCode: places.talavera.regionCode,
     },
     status: "approved",
   },
   {
-    key: "cavite",
-    parentKey: "calabarzon",
-    name: "Cavite Racing Pigeon Association",
-    code: "PH-CAV",
-    abbr: "CRPA",
-    level: "provincial",
-    location: {
-      region: places.indang.region,
-      regionCode: places.indang.regionCode,
-      province: places.indang.province,
-      provinceCode: places.indang.provinceCode,
-    },
-    status: "approved",
-  },
-  {
-    key: "laguna",
-    parentKey: "calabarzon",
-    name: "Laguna Racing Pigeon Association",
-    code: "PH-LAG",
-    abbr: "LRPA",
-    level: "provincial",
-    location: {
-      region: places.calamba.region,
-      regionCode: places.calamba.regionCode,
-      province: places.calamba.province,
-      provinceCode: places.calamba.provinceCode,
-    },
-    status: "approved",
-  },
-  {
-    key: "tarlac",
+    key: "nuevaEcija",
     parentKey: "centralLuzon",
-    name: "Tarlac Racing Pigeon Association",
-    code: "PH-TAR",
-    abbr: "TRPA",
+    name: "Nueva Ecija Racing Pigeon Association",
+    code: "PH-NUE",
+    abbr: "NERPA",
     level: "provincial",
     location: {
-      region: places.tarlacCity.region,
-      regionCode: places.tarlacCity.regionCode,
-      province: places.tarlacCity.province,
-      provinceCode: places.tarlacCity.provinceCode,
+      region: places.cabanatuan.region,
+      regionCode: places.cabanatuan.regionCode,
+      province: places.cabanatuan.province,
+      provinceCode: places.cabanatuan.provinceCode,
     },
     status: "approved",
   },
   {
-    key: "indang",
-    parentKey: "cavite",
-    name: "Indang Flyers Club",
-    code: "PH-CAV-IND",
-    abbr: "IFC",
+    key: "cabanatuan",
+    parentKey: "nuevaEcija",
+    name: "Cabanatuan Flyers Club",
+    code: "PH-NUE-CAB",
+    abbr: "CFC",
     level: "municipality",
     location: {
-      region: places.indang.region,
-      regionCode: places.indang.regionCode,
-      province: places.indang.province,
-      provinceCode: places.indang.provinceCode,
-      municipality: places.indang.municipality,
-      municipalityCode: places.indang.municipalityCode,
-      barangayCode: places.indang.barangayCode,
+      region: places.cabanatuan.region,
+      regionCode: places.cabanatuan.regionCode,
+      province: places.cabanatuan.province,
+      provinceCode: places.cabanatuan.provinceCode,
+      municipality: places.cabanatuan.municipality,
+      municipalityCode: places.cabanatuan.municipalityCode,
+      barangayCode: places.cabanatuan.barangayCode,
     },
     status: "approved",
     population: 4,
     social: {
-      fb: "https://facebook.com/indangflyers",
+      fb: "https://facebook.com/cabanatuanflyers",
     },
   },
   {
-    key: "silang",
-    parentKey: "cavite",
-    name: "Silang High Flyers Club",
-    code: "PH-CAV-SIL",
-    abbr: "SHFC",
+    key: "gapan",
+    parentKey: "nuevaEcija",
+    name: "Gapan High Flyers Club",
+    code: "PH-NUE-GAP",
+    abbr: "GHFC",
     level: "municipality",
     location: {
-      region: places.silang.region,
-      regionCode: places.silang.regionCode,
-      province: places.silang.province,
-      provinceCode: places.silang.provinceCode,
-      municipality: places.silang.municipality,
-      municipalityCode: places.silang.municipalityCode,
-      barangayCode: places.silang.barangayCode,
-    },
-    status: "approved",
-    population: 1,
-  },
-  {
-    key: "calamba",
-    parentKey: "laguna",
-    name: "Calamba Loft Masters Club",
-    code: "PH-LAG-CAL",
-    abbr: "CLMC",
-    level: "municipality",
-    location: {
-      region: places.calamba.region,
-      regionCode: places.calamba.regionCode,
-      province: places.calamba.province,
-      provinceCode: places.calamba.provinceCode,
-      municipality: places.calamba.municipality,
-      municipalityCode: places.calamba.municipalityCode,
-      barangayCode: places.calamba.barangayCode,
+      region: places.gapan.region,
+      regionCode: places.gapan.regionCode,
+      province: places.gapan.province,
+      provinceCode: places.gapan.provinceCode,
+      municipality: places.gapan.municipality,
+      municipalityCode: places.gapan.municipalityCode,
+      barangayCode: places.gapan.barangayCode,
     },
     status: "approved",
     population: 1,
   },
   {
-    key: "tarlacCity",
-    parentKey: "tarlac",
-    name: "Tarlac City Racing Flyers",
-    code: "PH-TAR-TAC",
-    abbr: "TCRF",
+    key: "sanJose",
+    parentKey: "nuevaEcija",
+    name: "San Jose Loft Masters Club",
+    code: "PH-NUE-SJC",
+    abbr: "SJLMC",
     level: "municipality",
     location: {
-      region: places.tarlacCity.region,
-      regionCode: places.tarlacCity.regionCode,
-      province: places.tarlacCity.province,
-      provinceCode: places.tarlacCity.provinceCode,
-      municipality: places.tarlacCity.municipality,
-      municipalityCode: places.tarlacCity.municipalityCode,
-      barangayCode: places.tarlacCity.barangayCode,
+      region: places.sanJose.region,
+      regionCode: places.sanJose.regionCode,
+      province: places.sanJose.province,
+      provinceCode: places.sanJose.provinceCode,
+      municipality: places.sanJose.municipality,
+      municipalityCode: places.sanJose.municipalityCode,
+      barangayCode: places.sanJose.barangayCode,
+    },
+    status: "approved",
+    population: 1,
+  },
+  {
+    key: "talavera",
+    parentKey: "nuevaEcija",
+    name: "Talavera Racing Flyers",
+    code: "PH-NUE-TAL",
+    abbr: "TRF",
+    level: "municipality",
+    location: {
+      region: places.talavera.region,
+      regionCode: places.talavera.regionCode,
+      province: places.talavera.province,
+      provinceCode: places.talavera.provinceCode,
+      municipality: places.talavera.municipality,
+      municipalityCode: places.talavera.municipalityCode,
+      barangayCode: places.talavera.barangayCode,
+    },
+    status: "approved",
+    population: 1,
+  },
+  {
+    key: "guimba",
+    parentKey: "nuevaEcija",
+    name: "Guimba Racing Club",
+    code: "PH-NUE-GUI",
+    abbr: "GRC",
+    level: "municipality",
+    location: {
+      region: places.guimba.region,
+      regionCode: places.guimba.regionCode,
+      province: places.guimba.province,
+      provinceCode: places.guimba.provinceCode,
+      municipality: places.guimba.municipality,
+      municipalityCode: places.guimba.municipalityCode,
+      barangayCode: places.guimba.barangayCode,
+    },
+    status: "approved",
+    population: 1,
+  },
+  {
+    key: "cabiao",
+    parentKey: "nuevaEcija",
+    name: "Cabiao Flyers Guild",
+    code: "PH-NUE-CBI",
+    abbr: "CFG",
+    level: "municipality",
+    location: {
+      region: places.cabiao.region,
+      regionCode: places.cabiao.regionCode,
+      province: places.cabiao.province,
+      provinceCode: places.cabiao.provinceCode,
+      municipality: places.cabiao.municipality,
+      municipalityCode: places.cabiao.municipalityCode,
+      barangayCode: places.cabiao.barangayCode,
     },
     status: "approved",
     population: 1,
@@ -247,9 +260,9 @@ const clubSeeds = [
 const userSeeds = [
   {
     key: "juan",
-    clubKey: "indang",
+    clubKey: "cabanatuan",
     loftKey: "lopezSky",
-    officer: "President",
+    managementTitle: "Owner",
     email: "juan.delacruz@agilatrack.test",
     fullName: {
       fname: "Juan",
@@ -260,13 +273,13 @@ const userSeeds = [
     },
     mobile: "09170000001",
     isMale: true,
-    placeKey: "indang",
+    placeKey: "cabanatuan",
   },
   {
     key: "maria",
-    clubKey: "indang",
+    clubKey: "cabanatuan",
     loftKey: "delaCruzNorth",
-    officer: "Secretary",
+    managementTitle: "Secretary",
     email: "maria.santos@agilatrack.test",
     fullName: {
       fname: "Maria",
@@ -277,13 +290,12 @@ const userSeeds = [
     },
     mobile: "09170000002",
     isMale: false,
-    placeKey: "indang",
+    placeKey: "cabanatuan",
   },
   {
     key: "pedro",
-    clubKey: "indang",
+    clubKey: "cabanatuan",
     loftKey: "ramosRidge",
-    officer: "Treasurer",
     email: "pedro.ramos@agilatrack.test",
     fullName: {
       fname: "Pedro",
@@ -294,13 +306,12 @@ const userSeeds = [
     },
     mobile: "09170000003",
     isMale: true,
-    placeKey: "indang",
+    placeKey: "cabanatuan",
   },
   {
     key: "ana",
-    clubKey: "indang",
+    clubKey: "cabanatuan",
     loftKey: "lopezSky",
-    officer: "Race Secretary",
     email: "ana.lopez@agilatrack.test",
     fullName: {
       fname: "Ana",
@@ -311,13 +322,13 @@ const userSeeds = [
     },
     mobile: "09170000004",
     isMale: false,
-    placeKey: "indang",
+    placeKey: "cabanatuan",
   },
   {
     key: "carlo",
-    clubKey: "silang",
+    clubKey: "gapan",
     loftKey: "carloBiga",
-    officer: "President",
+    managementTitle: "Owner",
     email: "carlo.mendoza@agilatrack.test",
     fullName: {
       fname: "Carlo",
@@ -328,13 +339,13 @@ const userSeeds = [
     },
     mobile: "09170000005",
     isMale: true,
-    placeKey: "silang",
+    placeKey: "gapan",
   },
   {
     key: "liza",
-    clubKey: "calamba",
+    clubKey: "sanJose",
     loftKey: "lizaReal",
-    officer: "President",
+    managementTitle: "Owner",
     email: "liza.cruz@agilatrack.test",
     fullName: {
       fname: "Liza",
@@ -345,13 +356,13 @@ const userSeeds = [
     },
     mobile: "09170000006",
     isMale: false,
-    placeKey: "calamba",
+    placeKey: "sanJose",
   },
   {
     key: "roberto",
-    clubKey: "tarlacCity",
+    clubKey: "talavera",
     loftKey: "robertoSanRoque",
-    officer: "President",
+    managementTitle: "Owner",
     email: "roberto.galang@agilatrack.test",
     fullName: {
       fname: "Roberto",
@@ -362,7 +373,7 @@ const userSeeds = [
     },
     mobile: "09170000007",
     isMale: true,
-    placeKey: "tarlacCity",
+    placeKey: "talavera",
   },
 ];
 
@@ -370,78 +381,78 @@ const loftSeeds = [
   {
     key: "lopezSky",
     managerKey: "ana",
-    clubKey: "indang",
-    code: "LOFT-IND-001",
+    clubKey: "cabanatuan",
+    code: "LOFT-CAB-001",
     name: "Lopez Sky Loft",
-    coordinates: { latitude: 14.1951, longitude: 120.8761 },
-    address: addressFromPlace(places.indang, "Mabini Street"),
+    coordinates: { latitude: 15.4859, longitude: 120.9667 },
+    address: addressFromPlace(places.cabanatuan, "Mabini Street"),
     capacity: 120,
-    notes: "Primary Indang sample loft near the municipal proper.",
+    notes: "Primary Cabanatuan sample loft near the city proper.",
   },
   {
     key: "delaCruzNorth",
     managerKey: "juan",
-    clubKey: "indang",
-    code: "LOFT-IND-002",
+    clubKey: "cabanatuan",
+    code: "LOFT-CAB-002",
     name: "Dela Cruz North Loft",
-    coordinates: { latitude: 14.1974, longitude: 120.8792 },
-    address: addressFromPlace(places.indang, "Rizal Avenue"),
+    coordinates: { latitude: 15.4882, longitude: 120.9713 },
+    address: addressFromPlace(places.cabanatuan, "Rizal Avenue"),
     capacity: 80,
-    notes: "Secondary Indang loft for race timing tests.",
+    notes: "Secondary Cabanatuan loft for race timing tests.",
   },
   {
     key: "ramosRidge",
     managerKey: "pedro",
-    clubKey: "indang",
-    code: "LOFT-IND-003",
+    clubKey: "cabanatuan",
+    code: "LOFT-CAB-003",
     name: "Ramos Ridge Loft",
-    coordinates: { latitude: 14.1906, longitude: 120.8697 },
-    address: addressFromPlace(places.indang, "Daang Hari Road"),
+    coordinates: { latitude: 15.4788, longitude: 120.9615 },
+    address: addressFromPlace(places.cabanatuan, "Daang Hari Road"),
     capacity: 95,
-    notes: "Treasurer managed loft with ridge-side test coordinates.",
+    notes: "Treasurer-managed loft with ridge-side test coordinates.",
   },
   {
     key: "carloBiga",
     managerKey: "carlo",
-    clubKey: "silang",
-    code: "LOFT-SIL-001",
-    name: "Mendoza Biga Loft",
-    coordinates: { latitude: 14.2305, longitude: 120.9747 },
-    address: addressFromPlace(places.silang, "Biga Road"),
+    clubKey: "gapan",
+    code: "LOFT-GAP-001",
+    name: "Mendoza San Vicente Loft",
+    coordinates: { latitude: 15.3074, longitude: 120.9466 },
+    address: addressFromPlace(places.gapan, "San Vicente Road"),
     capacity: 100,
-    notes: "Silang sample loft for cross-club testing.",
+    notes: "Gapan sample loft for cross-club testing.",
   },
   {
     key: "lizaReal",
     managerKey: "liza",
-    clubKey: "calamba",
-    code: "LOFT-CAL-001",
+    clubKey: "sanJose",
+    code: "LOFT-SJC-001",
     name: "Cruz Real Loft",
-    coordinates: { latitude: 14.2118, longitude: 121.1653 },
-    address: addressFromPlace(places.calamba, "Real Road"),
+    coordinates: { latitude: 15.7914, longitude: 120.9902 },
+    address: addressFromPlace(places.sanJose, "Real Road"),
     capacity: 90,
-    notes: "Calamba sample loft in Laguna.",
+    notes: "San Jose City sample loft in Nueva Ecija.",
   },
   {
     key: "robertoSanRoque",
     managerKey: "roberto",
-    clubKey: "tarlacCity",
-    code: "LOFT-TAC-001",
+    clubKey: "talavera",
+    code: "LOFT-TAL-001",
     name: "Galang San Roque Loft",
-    coordinates: { latitude: 15.4867, longitude: 120.5989 },
-    address: addressFromPlace(places.tarlacCity, "F. Tanedo Street"),
+    coordinates: { latitude: 15.5889, longitude: 120.9236 },
+    address: addressFromPlace(places.talavera, "Sampaloc Road"),
     capacity: 110,
-    notes: "Tarlac City sample loft for northern route tests.",
+    notes: "Talavera sample loft for northern route tests.",
   },
 ];
 
 const raceSeeds = [
   {
-    key: "indangTarlac100",
-    clubKey: "indang",
+    key: "cabanatuanTalavera100",
+    clubKey: "cabanatuan",
     organizerKey: "ana",
-    code: "IFC-2026-TAR-100",
-    name: "Indang Flyers Tarlac 100KM Training Race",
+    code: "CFC-2026-TAL-100",
+    name: "Cabanatuan Flyers Talavera 100KM Training Race",
     category: "old bird",
     raceDate: new Date("2026-05-03T06:00:00+08:00"),
     booking: {
@@ -451,12 +462,12 @@ const raceSeeds = [
     checkIn: {
       startsAt: new Date("2026-05-02T18:00:00+08:00"),
       endsAt: new Date("2026-05-02T21:00:00+08:00"),
-      location: "Indang Flyers Clubhouse, Poblacion IV, Indang, Cavite",
+      location: "Cabanatuan Flyers Clubhouse, Sangitan East, Cabanatuan City, Nueva Ecija",
     },
     boarding: {
       startsAt: new Date("2026-05-02T19:00:00+08:00"),
       endsAt: new Date("2026-05-02T22:00:00+08:00"),
-      location: "Indang Flyers Clubhouse Crate Area",
+      location: "Cabanatuan Flyers Clubhouse Crate Area",
     },
     transport: {
       handlerKey: "ana",
@@ -468,11 +479,11 @@ const raceSeeds = [
       },
       vehicle: {
         type: "closed van",
-        plateNumber: "CAV-4821",
+        plateNumber: "NUE-4821",
         description: "White ventilated race crate van",
       },
       origin: {
-        name: "Indang Flyers Clubhouse",
+        name: "Cabanatuan Flyers Clubhouse",
         departedAt: new Date("2026-05-03T02:00:00+08:00"),
       },
       releaseSiteArrival: {
@@ -483,12 +494,12 @@ const raceSeeds = [
       notes: "Sample transport chain of custody for the training race.",
     },
     departure: {
-      siteName: "Tarlac City Release Site",
+      siteName: "Talavera Release Site",
       departedAt: new Date("2026-05-03T06:00:00+08:00"),
-      coordinates: { latitude: 15.4867, longitude: 120.5989 },
+      coordinates: { latitude: 15.5889, longitude: 120.9236 },
       address: {
-        municipality: "Tarlac City",
-        province: "Tarlac",
+        municipality: "Talavera",
+        province: "Nueva Ecija",
         region: "Central Luzon",
       },
     },
@@ -511,11 +522,11 @@ const raceSeeds = [
     status: "departed",
   },
   {
-    key: "indangSubic150",
-    clubKey: "indang",
+    key: "cabanatuanGuimba150",
+    clubKey: "cabanatuan",
     organizerKey: "juan",
-    code: "IFC-2026-SBC-150",
-    name: "Indang Flyers Subic 150KM Futurity",
+    code: "CFC-2026-GUI-150",
+    name: "Cabanatuan Flyers Guimba 150KM Futurity",
     category: "young bird",
     raceDate: new Date("2026-05-17T06:15:00+08:00"),
     booking: {
@@ -525,12 +536,12 @@ const raceSeeds = [
     checkIn: {
       startsAt: new Date("2026-05-16T18:00:00+08:00"),
       endsAt: new Date("2026-05-16T21:00:00+08:00"),
-      location: "Indang Flyers Clubhouse, Poblacion IV, Indang, Cavite",
+      location: "Cabanatuan Flyers Clubhouse, Sangitan East, Cabanatuan City, Nueva Ecija",
     },
     boarding: {
       startsAt: new Date("2026-05-16T19:00:00+08:00"),
       endsAt: new Date("2026-05-16T22:00:00+08:00"),
-      location: "Indang Flyers Clubhouse Crate Area",
+      location: "Cabanatuan Flyers Clubhouse Crate Area",
     },
     transport: {
       handlerKey: "maria",
@@ -541,18 +552,18 @@ const raceSeeds = [
       },
       vehicle: {
         type: "utility van",
-        plateNumber: "CAV-1501",
+        plateNumber: "NUE-1501",
       },
       origin: {
-        name: "Indang Flyers Clubhouse",
+        name: "Cabanatuan Flyers Clubhouse",
       },
     },
     departure: {
-      siteName: "Subic Bay Release Site",
-      coordinates: { latitude: 14.8232, longitude: 120.2783 },
+      siteName: "Guimba Release Site",
+      coordinates: { latitude: 15.6606, longitude: 120.7683 },
       address: {
-        municipality: "Subic",
-        province: "Zambales",
+        municipality: "Guimba",
+        province: "Nueva Ecija",
         region: "Central Luzon",
       },
     },
@@ -571,7 +582,7 @@ const raceSeeds = [
 
 const raceEntrySeeds = [
   {
-    raceKey: "indangTarlac100",
+    raceKey: "cabanatuanTalavera100",
     userKey: "juan",
     loftKey: "delaCruzNorth",
     bird: {
@@ -592,14 +603,14 @@ const raceEntrySeeds = [
       checkedInAt: new Date("2026-05-02T18:12:00+08:00"),
       station: {
         code: "IFC-CHK",
-        name: "Indang Flyers Clubhouse Check-in",
-        coordinates: { latitude: 14.1955, longitude: 120.8767 },
+        name: "Cabanatuan Flyers Clubhouse Check-in",
+        coordinates: { latitude: 15.4862, longitude: 120.9684 },
         address: {
           street: "Mabini Street",
-          barangay: places.indang.barangay,
-          municipality: places.indang.municipality,
-          province: places.indang.province,
-          region: places.indang.region,
+          barangay: places.cabanatuan.barangay,
+          city: places.cabanatuan.municipality,
+          province: places.cabanatuan.province,
+          region: places.cabanatuan.region,
         },
       },
     },
@@ -618,7 +629,7 @@ const raceEntrySeeds = [
     status: "arrived",
   },
   {
-    raceKey: "indangTarlac100",
+    raceKey: "cabanatuanTalavera100",
     userKey: "maria",
     loftKey: "delaCruzNorth",
     bird: {
@@ -638,8 +649,8 @@ const raceEntrySeeds = [
       checkedInAt: new Date("2026-05-02T18:25:00+08:00"),
       station: {
         code: "IFC-CHK",
-        name: "Indang Flyers Clubhouse Check-in",
-        coordinates: { latitude: 14.1955, longitude: 120.8767 },
+        name: "Cabanatuan Flyers Clubhouse Check-in",
+        coordinates: { latitude: 15.4862, longitude: 120.9684 },
       },
     },
     boarding: {
@@ -656,7 +667,7 @@ const raceEntrySeeds = [
     status: "arrived",
   },
   {
-    raceKey: "indangTarlac100",
+    raceKey: "cabanatuanTalavera100",
     userKey: "pedro",
     loftKey: "ramosRidge",
     bird: {
@@ -676,7 +687,7 @@ const raceEntrySeeds = [
       checkedInAt: new Date("2026-05-02T18:45:00+08:00"),
       station: {
         code: "IFC-CHK",
-        name: "Indang Flyers Clubhouse Check-in",
+        name: "Cabanatuan Flyers Clubhouse Check-in",
       },
     },
     boarding: {
@@ -689,7 +700,7 @@ const raceEntrySeeds = [
     status: "departed",
   },
   {
-    raceKey: "indangSubic150",
+    raceKey: "cabanatuanGuimba150",
     userKey: "ana",
     loftKey: "lopezSky",
     bird: {
@@ -708,21 +719,19 @@ const raceEntrySeeds = [
   },
 ];
 
-const roleByOfficer = {
-  President: 1,
+const accessRoleByManagementTitle = {
+  Owner: 1,
   Secretary: 2,
-  Treasurer: 3,
-  "Race Secretary": 4,
 };
 
 const memberCodeByUserKey = {
-  juan: "IFC-0001",
-  maria: "IFC-0002",
-  pedro: "IFC-0003",
-  ana: "IFC-0004",
-  carlo: "SHFC-0001",
-  liza: "CLMC-0001",
-  roberto: "TCRF-0001",
+  juan: "CFC-0001",
+  maria: "CFC-0002",
+  pedro: "CFC-0003",
+  ana: "CFC-0004",
+  carlo: "GHFC-0001",
+  liza: "SJLMC-0001",
+  roberto: "TRF-0001",
 };
 
 const resetSeedData = async () => {
@@ -740,7 +749,7 @@ const resetSeedData = async () => {
   await Promise.all([
     RaceEntries.deleteMany({ race: { $in: races.map((race) => race._id) } }),
     Races.deleteMany({ code: { $in: seedRaceCodes } }),
-    Officers.deleteMany({
+    ClubManagement.deleteMany({
       $or: [
         { user: { $in: users.map((user) => user._id) } },
         { club: { $in: clubs.map((club) => club._id) } },
@@ -768,7 +777,7 @@ const upsertUser = async (seed) => {
     fullName: seed.fullName,
     mobile: seed.mobile,
     membership: "regular",
-    state: ["patron"],
+    state: ["guest"],
     isMale: seed.isMale,
     profile: {
       status: "approved",
@@ -783,7 +792,7 @@ const upsertUser = async (seed) => {
       zip: place.zip,
     },
     work: {
-      title: seed.officer || "Racer",
+      title: seed.managementTitle || "Racer",
       company: `${seed.clubKey} racing club`,
       province: place.province,
       createdAt: new Date(),
@@ -802,6 +811,28 @@ const upsertClub = async (seed, clubsByKey) => {
   club.set({
     ...seed,
     parent,
+    address: seed.location
+      ? {
+          street: `${seed.location.municipality || seed.location.province || "Club"} Clubhouse`,
+          barangay:
+            Object.values(places).find(
+              (place) =>
+                place.region === seed.location.region &&
+                place.province === seed.location.province &&
+                place.municipality === seed.location.municipality,
+            )?.barangay || "",
+          city: seed.location.municipality || "",
+          province: seed.location.province || "",
+          region: seed.location.region || "",
+          zip:
+            Object.values(places).find(
+              (place) =>
+                place.region === seed.location.region &&
+                place.province === seed.location.province &&
+                place.municipality === seed.location.municipality,
+            )?.zip || "",
+        }
+      : undefined,
     isActive: true,
   });
 
@@ -827,7 +858,7 @@ const upsertAffiliation = async ({ userSeed, usersByKey, clubsByKey, loftsByKey 
   const user = usersByKey[userSeed.key];
   const club = clubsByKey[userSeed.clubKey];
   const loft = loftsByKey[userSeed.loftKey];
-  const officerRole = roleByOfficer[userSeed.officer] || 1;
+  const accessRole = accessRoleByManagementTitle[userSeed.managementTitle] || 1;
 
   const affiliation =
     (await Affiliations.findOne({ user: user._id, club: club._id })) ||
@@ -857,33 +888,33 @@ const upsertAffiliation = async ({ userSeed, usersByKey, clubsByKey, loftsByKey 
   user.activePlatform = {
     _id: affiliation._id,
     club: club._id,
-    role: officerRole,
+    role: accessRole,
     portal: "club",
-    access: [String(officerRole)],
+    access: [String(accessRole)],
   };
   await user.save();
 
   return affiliation;
 };
 
-const upsertOfficer = async ({ userSeed, usersByKey, clubsByKey }) => {
+const upsertManagementMember = async ({ userSeed, usersByKey, clubsByKey }) => {
   const user = usersByKey[userSeed.key];
   const club = clubsByKey[userSeed.clubKey];
-  const officer =
-    (await Officers.findOne({
+  const managementMember =
+    (await ClubManagement.findOne({
       user: user._id,
       club: club._id,
-      authorization: userSeed.officer,
-    })) || new Officers();
+      title: userSeed.managementTitle,
+    })) || new ClubManagement();
 
-  officer.set({
+  managementMember.set({
     user: user._id,
     club: club._id,
-    authorization: userSeed.officer,
+    title: userSeed.managementTitle,
   });
 
-  await officer.save();
-  return officer;
+  await managementMember.save();
+  return managementMember;
 };
 
 const upsertRace = async ({ seed, usersByKey, clubsByKey }) => {
@@ -1052,20 +1083,20 @@ const seed = async () => {
     affiliationsByUserKey[userSeed.key] = affiliation;
   }
 
-  const officers = [];
-  for (const userSeed of userSeeds.filter((seed) => seed.officer)) {
-    officers.push(await upsertOfficer({ userSeed, usersByKey, clubsByKey }));
+  const managementMembers = [];
+  for (const userSeed of userSeeds.filter((seed) => seed.managementTitle)) {
+    managementMembers.push(
+      await upsertManagementMember({ userSeed, usersByKey, clubsByKey }),
+    );
   }
 
-  const indangClub = clubsByKey.indang;
-  indangClub.leadership = {
-    president: { user: usersByKey.juan._id },
+  const cabanatuanClub = clubsByKey.cabanatuan;
+  cabanatuanClub.management = {
+    owner: { user: usersByKey.juan._id },
     secretary: { user: usersByKey.maria._id },
-    treasurer: { user: usersByKey.pedro._id },
-    officers: [{ position: "Race Secretary", user: usersByKey.ana._id }],
   };
-  indangClub.contacts = usersByKey.maria._id;
-  await indangClub.save();
+  cabanatuanClub.contacts = usersByKey.maria._id;
+  await cabanatuanClub.save();
 
   const racesByKey = {};
   const raceSeedsByKey = {};
@@ -1092,7 +1123,7 @@ const seed = async () => {
     );
   }
 
-  await RaceEntries.recalculateRanks(racesByKey.indangTarlac100._id);
+  await RaceEntries.recalculateRanks(racesByKey.cabanatuanTalavera100._id);
 
   console.log("Seed complete:");
   console.table({
@@ -1100,7 +1131,7 @@ const seed = async () => {
     clubs: Object.keys(clubsByKey).length,
     lofts: Object.keys(loftsByKey).length,
     affiliations: affiliations.length,
-    officers: officers.length,
+    managementMembers: managementMembers.length,
     races: Object.keys(racesByKey).length,
     raceEntries: raceEntries.length,
   });

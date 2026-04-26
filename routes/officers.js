@@ -9,6 +9,7 @@ import {
 
 const router = express.Router();
 
+// Legacy alias for club management endpoints.
 router.get("/", findAll);
 router.get("/:id", findOne);
 router.post("/", createOfficer);

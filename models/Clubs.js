@@ -126,35 +126,8 @@ const modelSchema = new Schema(
       },
     },
 
-    org: {
-      nodes: [
-        {
-          id: { type: String },
-          dragging: { type: Boolean },
-          height: { type: Number },
-          position: { type: Object },
-          positionAbsolute: { type: Object },
-          type: { type: String },
-          width: { type: Number },
-          data: {
-            personnel: {
-              type: mongoose.Schema.Types.ObjectId,
-              ref: "Personnels",
-            },
-          },
-        },
-      ],
-      edges: [],
-    },
-
-    leadership: {
-      president: {
-        user: {
-          type: mongoose.Schema.Types.ObjectId,
-          ref: "Users",
-        },
-      },
-      vicePresident: {
+    management: {
+      owner: {
         user: {
           type: mongoose.Schema.Types.ObjectId,
           ref: "Users",
@@ -166,18 +139,6 @@ const modelSchema = new Schema(
           ref: "Users",
         },
       },
-      treasurer: {
-        user: {
-          type: mongoose.Schema.Types.ObjectId,
-          ref: "Users",
-        },
-      },
-      officers: [
-        {
-          position: { type: String },
-          user: { type: mongoose.Schema.Types.ObjectId, ref: "Users" },
-        },
-      ],
     },
 
     contacts: {
@@ -204,14 +165,6 @@ const modelSchema = new Schema(
     tagline: { type: String },
     history: { type: String },
     message: { type: String },
-
-    ct: { type: String },
-    icId: {
-      front: { type: String },
-      back: { type: String },
-    },
-    icgId: { type: String },
-
     social: {
       fb: { type: String },
       ig: { type: String },
