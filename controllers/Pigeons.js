@@ -1,7 +1,30 @@
+import {
+  ensureOwnerOrClubManager,
+  hasClubManagementAccess,
+} from "../middleware/auth.js";
 import Pigeons from "../models/Pigeons.js";
 
 const sendError = (res, error, status = 400) =>
   res.status(status).json({ error: error.message || error });
+const SELF_PIGEON_FIELDS = [
+  "affiliation",
+  "bandNumber",
+  "birdImage",
+  "breeder",
+  "color",
+  "hatchDate",
+  "hatchYear",
+  "healthRecords",
+  "healthStatus",
+  "loft",
+  "name",
+  "parents",
+  "pedigree",
+  "remarks",
+  "sex",
+  "status",
+  "strain",
+];
 
 const populatePigeon = (query) =>
   query
@@ -52,6 +75,15 @@ const buildPigeonQuery = (query = {}) => {
   return dbQuery;
 };
 
+const pickAllowedSelfPigeonUpdates = (payload = {}) =>
+  SELF_PIGEON_FIELDS.reduce((accumulator, field) => {
+    if (payload[field] !== undefined) {
+      accumulator[field] = payload[field];
+    }
+
+    return accumulator;
+  }, {});
+
 export const findAll = async (req, res) => {
   try {
     const payload = await populatePigeon(
@@ -82,7 +114,17 @@ export const findOne = async (req, res) => {
 
 export const createPigeon = async (req, res) => {
   try {
-    const created = await Pigeons.create(req.body);
+    const isManager = hasClubManagementAccess(req.auth);
+    const ownerId = req.body?.owner || req.auth.user._id;
+
+    if (!isManager) {
+      ensureOwnerOrClubManager(ownerId, req.auth);
+    }
+
+    const created = await Pigeons.create({
+      ...req.body,
+      owner: ownerId,
+    });
     const payload = await populatePigeon(Pigeons.findById(created._id)).lean({
       virtuals: true,
     });
@@ -98,7 +140,16 @@ export const updatePigeon = async (req, res) => {
     const pigeon = await Pigeons.findById(req.params.id);
     if (!pigeon) return res.status(404).json({ error: "Pigeon not found" });
 
-    pigeon.set(req.body);
+    const isManager = hasClubManagementAccess(req.auth);
+    ensureOwnerOrClubManager(pigeon.owner, req.auth);
+
+    const nextPayload = isManager ? req.body : pickAllowedSelfPigeonUpdates(req.body);
+
+    if (!Object.keys(nextPayload || {}).length) {
+      return res.status(400).json({ error: "No allowed pigeon fields were provided." });
+    }
+
+    pigeon.set(nextPayload);
     await pigeon.save();
 
     const payload = await populatePigeon(Pigeons.findById(pigeon._id)).lean({
@@ -113,6 +164,12 @@ export const updatePigeon = async (req, res) => {
 
 export const deletePigeon = async (req, res) => {
   try {
+    const pigeon = await Pigeons.findById(req.params.id).select("owner");
+
+    if (!pigeon) return res.status(404).json({ error: "Pigeon not found" });
+
+    ensureOwnerOrClubManager(pigeon.owner, req.auth);
+
     const payload = await populatePigeon(
       Pigeons.findByIdAndUpdate(
         req.params.id,
@@ -120,8 +177,6 @@ export const deletePigeon = async (req, res) => {
         { new: true },
       ),
     ).lean({ virtuals: true });
-
-    if (!payload) return res.status(404).json({ error: "Pigeon not found" });
 
     res.json({ success: "Pigeon archived successfully", payload });
   } catch (error) {

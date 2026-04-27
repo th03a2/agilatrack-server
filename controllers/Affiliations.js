@@ -1,10 +1,15 @@
 import mongoose from "mongoose";
+import {
+  ensureOwnerOrClubManager,
+  hasClubManagementAccess,
+} from "../middleware/auth.js";
 import Affiliations from "../models/Affiliations.js";
 import Pigeons from "../models/Pigeons.js";
 import Clubs from "../models/Clubs.js";
 
 const sendError = (res, error, status = 400) =>
   res.status(status).json({ error: error.message || error });
+const SELF_AFFILIATION_FIELDS = ["application", "lofts", "mobile", "primaryLoft", "remarks"];
 
 const populateAffiliation = (query) =>
   query
@@ -171,6 +176,15 @@ const buildAffiliationQuery = (query = {}) => {
   return dbQuery;
 };
 
+const pickAllowedSelfAffiliationUpdates = (payload = {}) =>
+  SELF_AFFILIATION_FIELDS.reduce((accumulator, field) => {
+    if (payload[field] !== undefined) {
+      accumulator[field] = payload[field];
+    }
+
+    return accumulator;
+  }, {});
+
 const validateClubId = (clubId) => {
   if (!mongoose.Types.ObjectId.isValid(clubId)) {
     throw new Error("Club id is invalid.");
@@ -324,8 +338,14 @@ const buildAdminDashboardPayload = async (clubId) => {
 
 export const findAll = async (req, res) => {
   try {
+    const query = buildAffiliationQuery(req.query);
+
+    if (!hasClubManagementAccess(req.auth)) {
+      query.user = req.auth.user._id;
+    }
+
     const payload = await populateAffiliation(
-      Affiliations.find(buildAffiliationQuery(req.query)),
+      Affiliations.find(query),
     )
       .sort({ createdAt: -1 })
       .lean({ virtuals: true });
@@ -355,6 +375,10 @@ export const findOne = async (req, res) => {
       return res.status(404).json({ error: "Affiliation not found" });
     }
 
+    if (!hasClubManagementAccess(req.auth)) {
+      ensureOwnerOrClubManager(payload.user?._id, req.auth);
+    }
+
     res.json({ success: "Affiliation fetched successfully", payload });
   } catch (error) {
     sendError(res, error);
@@ -363,7 +387,18 @@ export const findOne = async (req, res) => {
 
 export const createAffiliation = async (req, res) => {
   try {
-    const created = await Affiliations.create(req.body);
+    const isManager = hasClubManagementAccess(req.auth);
+    const requesterId = req.auth.user._id;
+    const requestedUserId = req.body?.user || requesterId;
+
+    if (!isManager) {
+      ensureOwnerOrClubManager(requestedUserId, req.auth);
+    }
+
+    const created = await Affiliations.create({
+      ...req.body,
+      user: requestedUserId,
+    });
     const payload = await populateAffiliation(
       Affiliations.findById(created._id),
     ).lean({ virtuals: true });
@@ -385,7 +420,18 @@ export const updateAffiliation = async (req, res) => {
       return res.status(404).json({ error: "Affiliation not found" });
     }
 
-    affiliation.set(req.body);
+    const isManager = hasClubManagementAccess(req.auth);
+    ensureOwnerOrClubManager(affiliation.user, req.auth);
+
+    const nextPayload = isManager
+      ? req.body
+      : pickAllowedSelfAffiliationUpdates(req.body);
+
+    if (!Object.keys(nextPayload || {}).length) {
+      return res.status(400).json({ error: "No allowed affiliation fields were provided." });
+    }
+
+    affiliation.set(nextPayload);
     await affiliation.save();
 
     const payload = await populateAffiliation(
@@ -410,7 +456,7 @@ export const approveAffiliation = async (req, res) => {
     affiliation.approval = {
       ...(affiliation.approval || {}),
       approvedAt: new Date(),
-      approvedBy: req.body?.actorId || affiliation.approval?.approvedBy,
+      approvedBy: req.auth.user._id,
       reason: req.body?.reason || affiliation.approval?.reason,
     };
 
@@ -438,7 +484,7 @@ export const rejectAffiliation = async (req, res) => {
     affiliation.approval = {
       ...(affiliation.approval || {}),
       rejectedAt: new Date(),
-      rejectedBy: req.body?.actorId || affiliation.approval?.rejectedBy,
+      rejectedBy: req.auth.user._id,
       reason: req.body?.reason || affiliation.approval?.reason,
     };
 
@@ -489,6 +535,14 @@ export const assignAffiliationRole = async (req, res) => {
 
 export const deleteAffiliation = async (req, res) => {
   try {
+    const existing = await Affiliations.findById(req.params.id).select("user");
+
+    if (!existing) {
+      return res.status(404).json({ error: "Affiliation not found" });
+    }
+
+    ensureOwnerOrClubManager(existing.user, req.auth);
+
     const payload = await populateAffiliation(
       Affiliations.findByIdAndUpdate(
         req.params.id,
@@ -499,10 +553,6 @@ export const deleteAffiliation = async (req, res) => {
         { new: true },
       ),
     ).lean({ virtuals: true });
-
-    if (!payload) {
-      return res.status(404).json({ error: "Affiliation not found" });
-    }
 
     res.json({ success: "Affiliation archived successfully", payload });
   } catch (error) {

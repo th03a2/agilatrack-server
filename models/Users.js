@@ -59,6 +59,20 @@ const userSchema = new Schema(
       type: String,
       unique: true,
     },
+    emailVerificationCode: {
+      type: String,
+      trim: true,
+    },
+    emailVerificationExpires: {
+      type: Date,
+    },
+    emailVerificationSentAt: {
+      type: Date,
+    },
+    isEmailVerified: {
+      type: Boolean,
+      default: false,
+    },
     username: {
       type: String,
       trim: true,

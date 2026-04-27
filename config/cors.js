@@ -8,6 +8,7 @@ const normalizeOrigin = (value = "") =>
 const allowedOrigins = new Set(
   [
     env.CLIENT_URL,
+    ...env.ALLOWED_ORIGINS,
     "http://localhost:5173",
     "http://127.0.0.1:5173",
     "http://localhost:4173",
@@ -35,11 +36,12 @@ export const corsOptions = {
 
     callback(
       new Error(
-        `Origin "${origin}" is not allowed by CORS. Use the Vite client URL or update CLIENT_URL in server/.env.`,
+        `Origin "${origin}" is not allowed by CORS. Add it to CLIENT_URL or ALLOWED_ORIGINS in server/.env.`,
       ),
     );
   },
   methods: ["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"],
   allowedHeaders: ["Content-Type", "Authorization", "X-Device-Id"],
+  credentials: false,
   optionsSuccessStatus: 204,
 };

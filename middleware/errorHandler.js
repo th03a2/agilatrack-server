@@ -1,4 +1,5 @@
 import multer from "multer";
+import { env } from "../config/env.js";
 import { isAppError } from "../utils/appError.js";
 
 export const notFoundHandler = (req, res) => {
@@ -18,9 +19,13 @@ export const errorHandler = (error, req, res, next) => {
 
     res.status(400).json({
       error: isFileSizeError ? "File too large." : "Upload failed.",
-      details: isFileSizeError
-        ? "Maximum file size is 5MB."
-        : error.message || "The uploaded file could not be processed.",
+      ...(env.IS_PRODUCTION
+        ? {}
+        : {
+            details: isFileSizeError
+              ? `Maximum file size is ${env.MAX_UPLOAD_FILE_SIZE_MB}MB.`
+              : error.message || "The uploaded file could not be processed.",
+          }),
     });
     return;
   }
@@ -28,7 +33,7 @@ export const errorHandler = (error, req, res, next) => {
   if (isAppError(error)) {
     res.status(error.statusCode).json({
       error: error.message,
-      details: error.details,
+      ...(!env.IS_PRODUCTION && error.details ? { details: error.details } : {}),
     });
     return;
   }
@@ -36,7 +41,7 @@ export const errorHandler = (error, req, res, next) => {
   if (/not allowed by CORS/i.test(error?.message || "")) {
     res.status(403).json({
       error: "CORS request blocked.",
-      details: error.message,
+      ...(!env.IS_PRODUCTION ? { details: error.message } : {}),
     });
     return;
   }
@@ -45,6 +50,8 @@ export const errorHandler = (error, req, res, next) => {
 
   res.status(500).json({
     error: "Internal server error.",
-    details: error?.message || "An unexpected error occurred.",
+    ...(!env.IS_PRODUCTION
+      ? { details: error?.message || "An unexpected error occurred." }
+      : {}),
   });
 };

@@ -6,13 +6,14 @@ import {
   findOne,
   updateRace,
 } from "../controllers/Races.js";
+import { requireAuth, requireClubManagementAccess } from "../middleware/auth.js";
 
 const router = express.Router();
 
 router.get("/", findAll);
 router.get("/:id", findOne);
-router.post("/", createRace);
-router.put("/:id", updateRace);
-router.delete("/:id", deleteRace);
+router.post("/", requireAuth, requireClubManagementAccess, createRace);
+router.put("/:id", requireAuth, requireClubManagementAccess, updateRace);
+router.delete("/:id", requireAuth, requireClubManagementAccess, deleteRace);
 
 export default router;

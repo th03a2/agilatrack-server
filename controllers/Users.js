@@ -1,6 +1,16 @@
 import Users from "../models/Users.js";
+import { hasClubManagementAccess } from "../middleware/auth.js";
 
 const USER_SELECT = "-password -__v";
+const SELF_SERVICE_FIELDS = [
+  "email",
+  "fullName",
+  "mobile",
+  "pid",
+  "profilePhoto",
+  "username",
+  "validIdImage",
+];
 
 const sendError = (res, error, status = 400) =>
   res.status(status).json({ error: error.message || error });
@@ -57,6 +67,15 @@ const buildUserQuery = (query = {}) => {
   return dbQuery;
 };
 
+const pickAllowedSelfUpdates = (payload = {}) =>
+  SELF_SERVICE_FIELDS.reduce((accumulator, field) => {
+    if (payload[field] !== undefined) {
+      accumulator[field] = payload[field];
+    }
+
+    return accumulator;
+  }, {});
+
 export const findAll = async (req, res) => {
   try {
     const payload = await Users.find(buildUserQuery(req.query))
@@ -102,7 +121,14 @@ export const updateUser = async (req, res) => {
     const user = await Users.findById(req.params.id);
     if (!user) return res.status(404).json({ error: "User not found" });
 
-    user.set(req.body);
+    const isManager = hasClubManagementAccess(req.auth);
+    const nextPayload = isManager ? req.body : pickAllowedSelfUpdates(req.body);
+
+    if (!Object.keys(nextPayload || {}).length) {
+      return res.status(400).json({ error: "No allowed profile fields were provided." });
+    }
+
+    user.set(nextPayload);
     await user.save();
 
     const payload = await Users.findById(user._id)

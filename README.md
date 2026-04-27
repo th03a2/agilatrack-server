@@ -25,6 +25,10 @@ JWT_SECRET=<your-local-jwt-secret>
 CLIENT_URL=http://localhost:5173
 ```
 
+`JWT_SECRET` is required and should be a unique local value with at least 32 characters.
+
+Email delivery settings are optional during local development. If `EMAIL_HOST`, `EMAIL_USER`, `EMAIL_PASS`, or `EMAIL_FROM` are left blank while `NODE_ENV` is not `production`, the API will return a temporary verification code preview instead of sending an email.
+
 Install dependencies and run the API:
 
 ```bash
@@ -105,6 +109,46 @@ Health and route list:
 | --- | --- | --- |
 | GET | `/` | API health and endpoint summary |
 | GET | `/api/routes` | List available API routes |
+
+Operational resources:
+
+| Method | Path | Description |
+| --- | --- | --- |
+| GET | `/api/payments` | List payment records |
+| GET | `/api/payments/:id` | Fetch one payment record |
+| POST | `/api/payments` | Create payment record |
+| PUT | `/api/payments/:id` | Update payment record |
+| DELETE | `/api/payments/:id` | Archive payment record |
+| GET | `/api/payouts` | List payout records |
+| GET | `/api/payouts/:id` | Fetch one payout record |
+| POST | `/api/payouts` | Create payout record |
+| PUT | `/api/payouts/:id` | Update payout record |
+| DELETE | `/api/payouts/:id` | Archive payout record |
+| GET | `/api/products` | List product records |
+| GET | `/api/products/:id` | Fetch one product record |
+| POST | `/api/products` | Create product record |
+| PUT | `/api/products/:id` | Update product record |
+| DELETE | `/api/products/:id` | Archive product record |
+| GET | `/api/orders` | List order records |
+| GET | `/api/orders/:id` | Fetch one order record |
+| POST | `/api/orders` | Create order record |
+| PUT | `/api/orders/:id` | Update order record |
+| DELETE | `/api/orders/:id` | Archive order record |
+| GET | `/api/sellers` | List seller records |
+| GET | `/api/sellers/:id` | Fetch one seller record |
+| POST | `/api/sellers` | Create seller record |
+| PUT | `/api/sellers/:id` | Update seller record |
+| DELETE | `/api/sellers/:id` | Archive seller record |
+| GET | `/api/shipments` | List shipment records |
+| GET | `/api/shipments/:id` | Fetch one shipment record |
+| POST | `/api/shipments` | Create shipment record |
+| PUT | `/api/shipments/:id` | Update shipment record |
+| DELETE | `/api/shipments/:id` | Archive shipment record |
+| GET | `/api/support` | List support ticket records |
+| GET | `/api/support/:id` | Fetch one support ticket |
+| POST | `/api/support` | Create support ticket |
+| PUT | `/api/support/:id` | Update support ticket |
+| DELETE | `/api/support/:id` | Archive support ticket |
 
 Clubs:
 

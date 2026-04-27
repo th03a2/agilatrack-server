@@ -10,6 +10,7 @@ import {
   findPyramid,
   findTree,
 } from "../controllers/Clubs.js";
+import { requireClubManagementAccess, requireAuth } from "../middleware/auth.js";
 
 const router = express.Router();
 
@@ -19,8 +20,8 @@ router.get("/pyramid", findPyramid);
 router.get("/:id/tree", findTree);
 router.get("/:id/children", findChildren);
 router.get("/:id", findOne);
-router.post("/", createClub);
-router.put("/:id", updateClub);
-router.delete("/:id", deleteClub);
+router.post("/", requireAuth, requireClubManagementAccess, createClub);
+router.put("/:id", requireAuth, requireClubManagementAccess, updateClub);
+router.delete("/:id", requireAuth, requireClubManagementAccess, deleteClub);
 
 export default router;

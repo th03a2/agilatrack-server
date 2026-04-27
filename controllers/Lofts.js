@@ -1,7 +1,20 @@
+import {
+  ensureOwnerOrClubManager,
+  hasClubManagementAccess,
+} from "../middleware/auth.js";
 import Lofts from "../models/Lofts.js";
 
 const sendError = (res, error, status = 400) =>
   res.status(status).json({ error: error.message || error });
+const SELF_LOFT_FIELDS = [
+  "address",
+  "capacity",
+  "code",
+  "coordinates",
+  "name",
+  "notes",
+  "status",
+];
 
 const populateLoft = (query) =>
   query
@@ -39,6 +52,15 @@ const buildLoftQuery = (query = {}) => {
   return dbQuery;
 };
 
+const pickAllowedSelfLoftUpdates = (payload = {}) =>
+  SELF_LOFT_FIELDS.reduce((accumulator, field) => {
+    if (payload[field] !== undefined) {
+      accumulator[field] = payload[field];
+    }
+
+    return accumulator;
+  }, {});
+
 export const findAll = async (req, res) => {
   try {
     const payload = await populateLoft(Lofts.find(buildLoftQuery(req.query)))
@@ -65,7 +87,17 @@ export const findOne = async (req, res) => {
 
 export const createLoft = async (req, res) => {
   try {
-    const created = await Lofts.create(req.body);
+    const isManager = hasClubManagementAccess(req.auth);
+    const managerId = req.body?.manager || req.auth.user._id;
+
+    if (!isManager) {
+      ensureOwnerOrClubManager(managerId, req.auth);
+    }
+
+    const created = await Lofts.create({
+      ...req.body,
+      manager: managerId,
+    });
     const payload = await populateLoft(Lofts.findById(created._id)).lean();
 
     res.status(201).json({ success: "Loft created successfully", payload });
@@ -79,7 +111,16 @@ export const updateLoft = async (req, res) => {
     const loft = await Lofts.findById(req.params.id);
     if (!loft) return res.status(404).json({ error: "Loft not found" });
 
-    loft.set(req.body);
+    const isManager = hasClubManagementAccess(req.auth);
+    ensureOwnerOrClubManager(loft.manager, req.auth);
+
+    const nextPayload = isManager ? req.body : pickAllowedSelfLoftUpdates(req.body);
+
+    if (!Object.keys(nextPayload || {}).length) {
+      return res.status(400).json({ error: "No allowed loft fields were provided." });
+    }
+
+    loft.set(nextPayload);
     await loft.save();
 
     const payload = await populateLoft(Lofts.findById(loft._id)).lean();
@@ -92,6 +133,12 @@ export const updateLoft = async (req, res) => {
 
 export const deleteLoft = async (req, res) => {
   try {
+    const loft = await Lofts.findById(req.params.id).select("manager");
+
+    if (!loft) return res.status(404).json({ error: "Loft not found" });
+
+    ensureOwnerOrClubManager(loft.manager, req.auth);
+
     const payload = await populateLoft(
       Lofts.findByIdAndUpdate(
         req.params.id,
@@ -99,8 +146,6 @@ export const deleteLoft = async (req, res) => {
         { new: true },
       ),
     ).lean();
-
-    if (!payload) return res.status(404).json({ error: "Loft not found" });
 
     res.json({ success: "Loft archived successfully", payload });
   } catch (error) {

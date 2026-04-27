@@ -1,3 +1,8 @@
+import cloudinary from "../config/cloudinary.js";
+import {
+  ensureClubManagementAccess,
+  ensureOwnerOrClubManager,
+} from "../middleware/auth.js";
 import Users from "../models/Users.js";
 import { AppError } from "../utils/appError.js";
 
@@ -7,6 +12,45 @@ const uploadMessages = {
   "club-logo": "Club logo uploaded successfully.",
   "profile-photo": "Profile photo uploaded successfully.",
   "valid-id": "Valid ID uploaded successfully.",
+};
+
+const destroyUploadedAsset = async (file) => {
+  const publicId = file?.filename || file?.public_id;
+
+  if (!publicId) {
+    return;
+  }
+
+  try {
+    await cloudinary.uploader.destroy(publicId, {
+      invalidate: true,
+      resource_type: "image",
+    });
+  } catch {
+    // Ignore cleanup failures and keep the main error path intact.
+  }
+};
+
+const assertUploadAccess = ({ assetType, auth, userId }) => {
+  if (["profile-photo", "valid-id"].includes(assetType)) {
+    if (!userId) {
+      throw new AppError(400, "A userId is required for this upload.");
+    }
+
+    ensureOwnerOrClubManager(
+      userId,
+      auth,
+      "You do not have permission to upload files for this user.",
+    );
+    return;
+  }
+
+  if (["club-logo", "announcement-banner"].includes(assetType)) {
+    ensureClubManagementAccess(
+      auth,
+      "You do not have permission to upload this asset.",
+    );
+  }
 };
 
 const saveUploadToUser = async ({ assetType, file, userId }) => {
@@ -50,6 +94,12 @@ export const createUploadSuccessHandler = (assetType) => async (req, res, next) 
       );
     }
 
+    assertUploadAccess({
+      assetType,
+      auth: req.auth,
+      userId: req.body?.userId,
+    });
+
     const user = await saveUploadToUser({
       assetType,
       file: req.file,
@@ -65,6 +115,7 @@ export const createUploadSuccessHandler = (assetType) => async (req, res, next) 
       user,
     });
   } catch (error) {
+    await destroyUploadedAsset(req.file);
     next(error);
   }
 };

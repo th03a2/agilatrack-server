@@ -205,6 +205,17 @@ const modelSchema = new Schema(
     tagline: { type: String },
     history: { type: String },
     message: { type: String },
+    description: { type: String, trim: true },
+    contactPerson: { type: String, trim: true },
+    contactNumber: { type: String, trim: true },
+    email: { type: String, trim: true, lowercase: true },
+    membershipFee: { type: String, trim: true },
+    clubType: {
+      type: String,
+      enum: ["Racing", "Breeding", "Show", "Mixed"],
+      default: "Mixed",
+    },
+    foundedDate: { type: String, trim: true },
 
     ct: { type: String },
     icId: {

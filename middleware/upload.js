@@ -1,9 +1,11 @@
 import multer from "multer";
+import path from "node:path";
 import { CloudinaryStorage } from "multer-storage-cloudinary";
 import cloudinary, {
   configureCloudinary,
   getCloudinaryStatus,
 } from "../config/cloudinary.js";
+import { env } from "../config/env.js";
 import { AppError } from "../utils/appError.js";
 
 const allowedFormats = ["jpg", "jpeg", "png", "webp"];
@@ -13,6 +15,7 @@ const allowedMimeTypes = new Set([
   "image/png",
   "image/webp",
 ]);
+const allowedExtensions = new Set([".jpg", ".jpeg", ".png", ".webp"]);
 
 const folderMap = {
   "profile-photo": "profile-photos",
@@ -35,9 +38,14 @@ const ensureCloudinaryReady = () => {
 
 const validateImageFile = (file) => {
   const mimeType = String(file?.mimetype || "").toLowerCase();
+  const extension = path.extname(String(file?.originalname || "")).toLowerCase();
 
   if (!allowedMimeTypes.has(mimeType)) {
     throw new AppError(400, "Only JPG, JPEG, PNG, and WEBP images are allowed.");
+  }
+
+  if (extension && !allowedExtensions.has(extension)) {
+    throw new AppError(400, "Invalid image file extension.");
   }
 };
 
@@ -88,6 +96,6 @@ export const createUploadMiddleware = (variant) =>
     storage: createStorage(variant),
     fileFilter: imageFileFilter,
     limits: {
-      fileSize: 5 * 1024 * 1024,
+      fileSize: env.MAX_UPLOAD_FILE_SIZE_BYTES,
     },
   });

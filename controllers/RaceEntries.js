@@ -1,10 +1,16 @@
+import {
+  ensureOwnerOrClubManager,
+  hasOperationalAccess,
+} from "../middleware/auth.js";
 import Affiliations from "../models/Affiliations.js";
 import Lofts from "../models/Lofts.js";
 import RaceEntries from "../models/RaceEntries.js";
 import Races from "../models/Races.js";
+import { AppError } from "../utils/appError.js";
 
 const sendError = (res, error, status = 400) =>
   res.status(status).json({ error: error.message || error });
+const SELF_ENTRY_FIELDS = ["bird", "booking", "loft", "loftSnapshot"];
 
 const populateEntry = (query) =>
   query
@@ -78,11 +84,43 @@ const assertEntryMatchesRace = (entry, race) => {
   }
 };
 
+const getAllowedAffiliationIds = (auth) =>
+  new Set((auth?.affiliations || []).map((affiliation) => String(affiliation._id)));
+
+const ensureRaceEntryAccess = (
+  affiliationId,
+  auth,
+  message = "You do not have permission to access this race entry.",
+) => {
+  if (hasOperationalAccess(auth)) {
+    return;
+  }
+
+  if (getAllowedAffiliationIds(auth).has(String(affiliationId || ""))) {
+    return;
+  }
+
+  throw new AppError(403, message);
+};
+
+const pickAllowedSelfEntryUpdates = (payload = {}) =>
+  SELF_ENTRY_FIELDS.reduce((accumulator, field) => {
+    if (payload[field] !== undefined) {
+      accumulator[field] = payload[field];
+    }
+
+    return accumulator;
+  }, {});
+
 export const findAll = async (req, res) => {
   try {
-    const payload = await populateEntry(
-      RaceEntries.find(buildEntryQuery(req.query)),
-    )
+    const query = buildEntryQuery(req.query);
+
+    if (!hasOperationalAccess(req.auth)) {
+      query.affiliation = { $in: [...getAllowedAffiliationIds(req.auth)] };
+    }
+
+    const payload = await populateEntry(RaceEntries.find(query))
       .sort({ createdAt: -1 })
       .lean({ virtuals: true });
 
@@ -101,6 +139,8 @@ export const findOne = async (req, res) => {
     if (!payload) {
       return res.status(404).json({ error: "Race entry not found" });
     }
+
+    ensureRaceEntryAccess(payload.affiliation?._id, req.auth);
 
     res.json({ success: "Race entry fetched successfully", payload });
   } catch (error) {
@@ -124,6 +164,12 @@ export const bookEntry = async (req, res) => {
     if (String(loft.club) !== String(race.club)) {
       throw new Error("Loft club must match the race club.");
     }
+
+    ensureOwnerOrClubManager(
+      affiliation.user,
+      req.auth,
+      "You do not have permission to book entries for this affiliation.",
+    );
 
     const created = await RaceEntries.create({
       ...req.body,
@@ -268,7 +314,17 @@ export const updateEntry = async (req, res) => {
     const entry = await RaceEntries.findById(req.params.id);
     if (!entry) return res.status(404).json({ error: "Race entry not found" });
 
-    entry.set(req.body);
+    ensureRaceEntryAccess(entry.affiliation, req.auth);
+
+    const nextPayload = hasOperationalAccess(req.auth)
+      ? req.body
+      : pickAllowedSelfEntryUpdates(req.body);
+
+    if (!Object.keys(nextPayload || {}).length) {
+      return res.status(400).json({ error: "No allowed race entry fields were provided." });
+    }
+
+    entry.set(nextPayload);
     await entry.save();
 
     const payload = await populateEntry(RaceEntries.findById(entry._id)).lean({
@@ -283,6 +339,14 @@ export const updateEntry = async (req, res) => {
 
 export const deleteEntry = async (req, res) => {
   try {
+    const entry = await RaceEntries.findById(req.params.id).select("affiliation");
+
+    if (!entry) {
+      return res.status(404).json({ error: "Race entry not found" });
+    }
+
+    ensureRaceEntryAccess(entry.affiliation, req.auth);
+
     const payload = await populateEntry(
       RaceEntries.findByIdAndUpdate(
         req.params.id,
@@ -293,10 +357,6 @@ export const deleteEntry = async (req, res) => {
         { new: true },
       ),
     ).lean({ virtuals: true });
-
-    if (!payload) {
-      return res.status(404).json({ error: "Race entry not found" });
-    }
 
     res.json({ success: "Race entry archived successfully", payload });
   } catch (error) {

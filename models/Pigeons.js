@@ -14,6 +14,13 @@ export const PIGEON_STATUSES = [
   "archived",
 ];
 
+export const PIGEON_HEALTH_STATUSES = [
+  "Excellent",
+  "Good",
+  "Fair",
+  "Poor",
+];
+
 const parentSchema = new Schema(
   {
     pigeon: {
@@ -91,6 +98,11 @@ const modelSchema = new Schema(
     color: {
       type: String,
       trim: true,
+    },
+    healthStatus: {
+      type: String,
+      enum: PIGEON_HEALTH_STATUSES,
+      default: "Good",
     },
     strain: {
       type: String,

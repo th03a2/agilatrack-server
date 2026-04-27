@@ -1,5 +1,6 @@
 import express from "express";
 import { createUploadSuccessHandler } from "../controllers/uploadController.js";
+import { requireAuth } from "../middleware/auth.js";
 import {
   createUploadMiddleware,
   ensureCloudinaryConfigured,
@@ -10,6 +11,7 @@ const router = express.Router();
 const registerUploadRoute = (path, assetType) => {
   router.post(
     path,
+    requireAuth,
     ensureCloudinaryConfigured,
     createUploadMiddleware(assetType).single("image"),
     createUploadSuccessHandler(assetType),
