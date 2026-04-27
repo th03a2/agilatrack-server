@@ -7,6 +7,7 @@ export const CLUB_LEVELS = [
   "regional",
   "national",
 ];
+export const CLUB_OWNERSHIP_TYPES = ["sole", "multiple"];
 
 export const CLUB_PARENT_LEVEL = {
   municipality: "provincial",
@@ -139,6 +140,13 @@ const modelSchema = new Schema(
           ref: "Users",
         },
       },
+    },
+    ownershipType: {
+      type: String,
+      enum: CLUB_OWNERSHIP_TYPES,
+      default: "sole",
+      trim: true,
+      lowercase: true,
     },
 
     contacts: {

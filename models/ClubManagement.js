@@ -57,6 +57,6 @@ modelSchema.query.byClub = function (club) {
 
 const Entity =
   mongoose.models.ClubManagement ||
-  mongoose.model("ClubManagement", modelSchema, "officers");
+  mongoose.model("ClubManagement", modelSchema);
 
 export default Entity;

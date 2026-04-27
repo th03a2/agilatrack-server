@@ -3,6 +3,7 @@ import mongoose from "mongoose";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import Affiliations from "../models/Affiliations.js";
+import Birds from "../models/Birds.js";
 import ClubManagement from "../models/ClubManagement.js";
 import Clubs from "../models/Clubs.js";
 import Lofts from "../models/Lofts.js";
@@ -739,6 +740,9 @@ const resetSeedData = async () => {
   const seedClubCodes = clubSeeds.map((club) => club.code);
   const seedLoftCodes = loftSeeds.map((loft) => loft.code);
   const seedRaceCodes = raceSeeds.map((race) => race.code);
+  const seedBirdBandNumbers = [
+    ...new Set(raceEntrySeeds.map((entry) => entry.bird.bandNumber)),
+  ];
 
   const [users, clubs, races] = await Promise.all([
     Users.find({ email: { $in: seedEmails } }).select("_id"),
@@ -747,6 +751,7 @@ const resetSeedData = async () => {
   ]);
 
   await Promise.all([
+    Birds.deleteMany({ bandNumber: { $in: seedBirdBandNumbers } }),
     RaceEntries.deleteMany({ race: { $in: races.map((race) => race._id) } }),
     Races.deleteMany({ code: { $in: seedRaceCodes } }),
     ClubManagement.deleteMany({
@@ -915,6 +920,34 @@ const upsertManagementMember = async ({ userSeed, usersByKey, clubsByKey }) => {
 
   await managementMember.save();
   return managementMember;
+};
+
+const upsertBird = async ({
+  seed,
+  usersByKey,
+  clubsByKey,
+  loftsByKey,
+  affiliationsByUserKey,
+}) => {
+  const user = usersByKey[seed.userKey];
+  const affiliation = affiliationsByUserKey[seed.userKey];
+  const club = clubsByKey[userSeeds.find((userSeed) => userSeed.key === seed.userKey)?.clubKey];
+  const loft = loftsByKey[seed.loftKey];
+  const bird = (await Birds.findOne({ bandNumber: seed.bird.bandNumber })) || new Birds();
+
+  bird.set({
+    ...seed.bird,
+    owner: user._id,
+    breeder: user._id,
+    affiliation: affiliation._id,
+    club: club._id,
+    loft: loft._id,
+    remarks: ["Seeded by seedAgilaTrack.js"],
+    status: "active",
+  });
+
+  await bird.save();
+  return bird;
 };
 
 const upsertRace = async ({ seed, usersByKey, clubsByKey }) => {
@@ -1098,6 +1131,21 @@ const seed = async () => {
   cabanatuanClub.contacts = usersByKey.maria._id;
   await cabanatuanClub.save();
 
+  const birdsByBandNumber = {};
+  for (const raceEntrySeed of raceEntrySeeds) {
+    if (!birdsByBandNumber[raceEntrySeed.bird.bandNumber]) {
+      const bird = await upsertBird({
+        seed: raceEntrySeed,
+        usersByKey,
+        clubsByKey,
+        loftsByKey,
+        affiliationsByUserKey,
+      });
+
+      birdsByBandNumber[raceEntrySeed.bird.bandNumber] = bird;
+    }
+  }
+
   const racesByKey = {};
   const raceSeedsByKey = {};
   for (const raceSeed of raceSeeds) {
@@ -1130,6 +1178,7 @@ const seed = async () => {
     users: Object.keys(usersByKey).length,
     clubs: Object.keys(clubsByKey).length,
     lofts: Object.keys(loftsByKey).length,
+    birds: Object.keys(birdsByBandNumber).length,
     affiliations: affiliations.length,
     managementMembers: managementMembers.length,
     races: Object.keys(racesByKey).length,

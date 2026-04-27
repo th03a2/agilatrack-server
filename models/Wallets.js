@@ -69,9 +69,10 @@ const transactionSchema = new Schema(
       type: Schema.Types.ObjectId,
       ref: "Affiliations",
     },
-    pigeon: {
+    bird: {
       type: Schema.Types.ObjectId,
       ref: "Birds",
+      alias: "pigeon",
     },
     race: {
       type: Schema.Types.ObjectId,

@@ -13,6 +13,7 @@ import cratesRouter from "./routes/crates.js";
 import loftsRouter from "./routes/lofts.js";
 import officersRouter from "./routes/officers.js";
 import birdsRouter from "./routes/birds.js";
+import avianHealthProfilesRouter from "./routes/avianHealthProfiles.js";
 import raceEntriesRouter from "./routes/raceEntries.js";
 import racesRouter from "./routes/races.js";
 import { nbiRoutes, logNbiRoutes } from "./routes/index.js";
@@ -29,7 +30,7 @@ const PORT = process.env.PORT || 5000;
 const MONGO_URI = process.env.MONGO_URI;
 
 app.use(cors());
-app.use(express.json());
+app.use(express.json({ limit: "15mb" }));
 
 app.use((error, req, res, next) => {
   if (
@@ -55,6 +56,8 @@ app.use("/nbi/crates", cratesRouter);
 app.use("/nbi/lofts", loftsRouter);
 app.use("/nbi/officers", officersRouter);
 app.use("/nbi/birds", birdsRouter);
+app.use("/nbi/ahp", avianHealthProfilesRouter);
+app.use("/nbi/avian-health-profiles", avianHealthProfilesRouter);
 app.use("/nbi/pigeons", birdsRouter);
 app.use("/nbi/pegions", birdsRouter);
 app.use("/nbi/race-entries", raceEntriesRouter);
@@ -72,6 +75,8 @@ app.use("/api/crates", cratesRouter);
 app.use("/api/lofts", loftsRouter);
 app.use("/api/officers", officersRouter);
 app.use("/api/birds", birdsRouter);
+app.use("/api/ahp", avianHealthProfilesRouter);
+app.use("/api/avian-health-profiles", avianHealthProfilesRouter);
 app.use("/api/pigeons", birdsRouter);
 app.use("/api/pegions", birdsRouter);
 app.use("/api/race-entries", raceEntriesRouter);
@@ -109,6 +114,7 @@ app.get("/", (req, res) => {
       lofts: "/nbi/lofts",
       officers: "/nbi/officers (legacy alias)",
       birds: "/nbi/birds",
+      ahp: "/nbi/ahp",
       pigeons: "/nbi/pigeons",
       raceEntries: "/nbi/race-entries",
       races: "/nbi/races",

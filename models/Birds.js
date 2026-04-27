@@ -3,6 +3,16 @@ import mongoose from "mongoose";
 const { Schema } = mongoose;
 
 export const BIRD_SEXES = ["cock", "hen", "unknown"];
+export const BIRD_CATEGORIES = [
+  "racer",
+  "breeder",
+  "young-bird",
+  "old-bird",
+  "stock-bird",
+  "show-bird",
+  "other",
+];
+export const BIRD_SPECIES = ["pigeon", "bird", "other"];
 export const BIRD_STATUSES = [
   "active",
   "breeding",
@@ -13,12 +23,15 @@ export const BIRD_STATUSES = [
   "sold",
   "archived",
 ];
+export const BIRD_PHOTO_TYPES = ["profile", "wing", "eye", "pedigree-doc"];
+export const BIRD_APPROVAL_STATUSES = ["pending", "approved", "rejected"];
 
 const parentSchema = new Schema(
   {
-    pigeon: {
+    bird: {
       type: Schema.Types.ObjectId,
       ref: "Birds",
+      alias: "pigeon",
     },
     bandNumber: {
       type: String,
@@ -34,26 +47,82 @@ const parentSchema = new Schema(
   { _id: false },
 );
 
-const healthRecordSchema = new Schema(
+const photoSchema = new Schema(
   {
     type: {
       type: String,
-      enum: ["vaccination", "medication", "checkup", "injury", "other"],
-      default: "other",
+      enum: BIRD_PHOTO_TYPES,
+      required: true,
     },
-    name: {
+    label: {
+      type: String,
+      trim: true,
+      maxlength: 80,
+    },
+    source: {
+      type: String,
+      trim: true,
+      required: true,
+    },
+    publicId: {
       type: String,
       trim: true,
     },
-    date: {
+    ownerKey: {
+      type: String,
+      trim: true,
+    },
+    mimeType: {
+      type: String,
+      trim: true,
+    },
+  },
+  { _id: false },
+);
+
+const approvalSchema = new Schema(
+  {
+    requestedAt: {
       type: Date,
       default: Date.now,
     },
-    administeredBy: {
+    approvedAt: { type: Date },
+    approvedBy: {
       type: Schema.Types.ObjectId,
       ref: "Users",
     },
-    remarks: {
+    rejectedAt: { type: Date },
+    rejectedBy: {
+      type: Schema.Types.ObjectId,
+      ref: "Users",
+    },
+    reason: { type: String, trim: true },
+  },
+  { _id: false },
+);
+
+const birdDocumentItemSchema = new Schema(
+  {
+    number: {
+      type: String,
+      trim: true,
+    },
+    resolutionNo: {
+      type: String,
+      trim: true,
+    },
+    fileUrl: {
+      type: String,
+      trim: true,
+    },
+    issuedAt: {
+      type: Date,
+    },
+    issuedBy: {
+      type: String,
+      trim: true,
+    },
+    status: {
       type: String,
       trim: true,
     },
@@ -91,6 +160,16 @@ const modelSchema = new Schema(
     strain: {
       type: String,
       trim: true,
+    },
+    species: {
+      type: String,
+      enum: BIRD_SPECIES,
+      default: "pigeon",
+    },
+    category: {
+      type: String,
+      enum: BIRD_CATEGORIES,
+      default: "racer",
     },
     hatchDate: {
       type: Date,
@@ -142,17 +221,40 @@ const modelSchema = new Schema(
         trim: true,
       },
     },
-    healthRecords: {
-      type: [healthRecordSchema],
-      default: [],
-    },
     status: {
       type: String,
       enum: BIRD_STATUSES,
       default: "active",
     },
+    approvalStatus: {
+      type: String,
+      enum: BIRD_APPROVAL_STATUSES,
+      default: "pending",
+    },
+    approval: {
+      type: approvalSchema,
+      default: () => ({}),
+    },
+    birdDocuments: {
+      wmp: {
+        type: birdDocumentItemSchema,
+        default: () => ({}),
+      },
+      barangay: {
+        type: birdDocumentItemSchema,
+        default: () => ({}),
+      },
+      qbr: {
+        type: birdDocumentItemSchema,
+        default: () => ({}),
+      },
+    },
     remarks: {
       type: [String],
+      default: [],
+    },
+    photos: {
+      type: [photoSchema],
       default: [],
     },
     deletedAt: {
@@ -175,6 +277,24 @@ modelSchema.pre("validate", function normalizeBird(next) {
     this.hatchYear = this.hatchDate.getFullYear();
   }
 
+  if (this.approvalStatus === "approved" && !this.approval?.approvedAt) {
+    this.approval = {
+      ...(this.approval || {}),
+      approvedAt: new Date(),
+      rejectedAt: undefined,
+      rejectedBy: undefined,
+    };
+  }
+
+  if (this.approvalStatus === "rejected" && !this.approval?.rejectedAt) {
+    this.approval = {
+      ...(this.approval || {}),
+      rejectedAt: new Date(),
+      approvedAt: undefined,
+      approvedBy: undefined,
+    };
+  }
+
   next();
 });
 
@@ -190,6 +310,6 @@ modelSchema.index({ affiliation: 1, status: 1, deletedAt: 1 });
 modelSchema.index({ loft: 1, status: 1, deletedAt: 1 });
 modelSchema.index({ club: 1, status: 1, createdAt: -1 });
 
-const Entity = mongoose.model("Birds", modelSchema, "pigeons");
+const Entity = mongoose.model("Birds", modelSchema);
 
 export default Entity;

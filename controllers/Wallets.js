@@ -22,7 +22,7 @@ const populateWallet = (query) =>
     })
     .populate("transactions.initiatedBy", "fullName email mobile pid")
     .populate("transactions.counterpartyWallet", "user ownerType balance status")
-    .populate("transactions.pigeon", "bandNumber name sex color strain status")
+    .populate("transactions.bird", "bandNumber name sex color strain status")
     .populate("transactions.race", "name code category raceDate status");
 
 const buildWalletQuery = (query = {}) => {
@@ -313,7 +313,7 @@ export const chargeBirdRegistrationFee = async (req, res) => {
       initiatedBy: req.body.initiatedBy,
       club: wallet.club,
       affiliation: wallet.affiliation,
-      pigeon: bird?._id,
+      bird: bird?._id,
       classification: req.body.classification,
       meta: {
         registrationType: req.body.registrationType,
