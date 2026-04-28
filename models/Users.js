@@ -129,19 +129,6 @@ const userSchema = new Schema(
       },
     ],
     siblings: [{ type: Schema.Types.ObjectId, ref: "Users" }],
-    credentials: {
-      //Post Graduate Degree
-      pgd: { type: String },
-      specialization: { type: String },
-      minor: { type: String },
-      lrn: { type: String },
-      psa: { type: String },
-      // Pantawid Pamilyang Pilipino Program (4P's)
-      pppp: { type: String },
-
-      //birth certificate
-      bc: { type: String },
-    },
     mobile: { type: String },
     membership: {
       type: String,
@@ -153,26 +140,6 @@ const userSchema = new Schema(
       type: Boolean,
       default: false,
     },
-    state: [
-      {
-        type: String,
-        enum: [
-          "patron",
-          "guest",
-          "observer",
-          "student",
-          "parent",
-          "guardian",
-          "employee",
-          "department-head",
-          "school-admin",
-          "scl-partner",
-          "scl-agent",
-          "scl-consultant",
-        ],
-        default: "patron",
-      },
-    ],
     // Personally Identifiable Information
     pii: {
       dob: { type: String },
@@ -194,20 +161,13 @@ const userSchema = new Schema(
         },
       },
       bt: { type: String }, //blood Type
-      ip: { type: String }, //Indigenous personal
-      pwd: { type: String }, // person with disability
-      //Mother Tongue
-      mt: { type: String },
     },
 
     // this files is id in cloudinary
     files: {
-      //PHASE 1 ENROLLMENT (ASSESSMENT)
       signature: { type: String }, //signature and profile
-      //APPLICATION FORM
       application: { type: String },
       resume: { type: String },
-      medical: { type: String },
     },
     // ✅ SOCIAL PROVIDERS
     providers: {
