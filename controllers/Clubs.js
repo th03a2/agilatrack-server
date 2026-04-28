@@ -1,5 +1,10 @@
 import mongoose from "mongoose";
-import Clubs, { CLUB_LEVELS, CLUB_PARENT_LEVEL } from "../models/Clubs.js";
+import Clubs, {
+  CLUB_LEVELS,
+  CLUB_PARENT_LEVEL,
+  CLUB_TYPES,
+  getClubTypeFromLevel,
+} from "../models/Clubs.js";
 
 const sendError = (res, error, status = 400) =>
   res.status(status).json({ error: error.message || error });
@@ -61,6 +66,7 @@ export const findAll = async (req, res) => {
   try {
     const {
       level,
+      type,
       parent,
       code,
       region,
@@ -74,6 +80,7 @@ export const findAll = async (req, res) => {
     const query = { deletedAt: { $exists: false } };
 
     if (level) query.level = level;
+    if (type) query.type = type;
     if (parent) query.parent = parent;
     if (code) query.code = { $regex: code, $options: "i" };
     if (region) query["location.region"] = region;
@@ -100,8 +107,12 @@ export const findLevels = async (req, res) => {
     success: "Club hierarchy levels fetched successfully",
     payload: {
       levels: CLUB_LEVELS,
+      types: CLUB_TYPES,
       parentLevel: CLUB_PARENT_LEVEL,
       pyramid: ["national", "regional", "provincial", "municipality"],
+      typeByLevel: Object.fromEntries(
+        CLUB_LEVELS.map((level) => [level, getClubTypeFromLevel(level)]),
+      ),
     },
   });
 };

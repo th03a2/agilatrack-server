@@ -7,6 +7,7 @@ export const CLUB_LEVELS = [
   "regional",
   "national",
 ];
+export const CLUB_TYPES = ["club", "operator"];
 export const CLUB_OWNERSHIP_TYPES = ["sole", "multiple"];
 
 export const CLUB_PARENT_LEVEL = {
@@ -15,6 +16,9 @@ export const CLUB_PARENT_LEVEL = {
   regional: "national",
   national: null,
 };
+
+export const getClubTypeFromLevel = (level) =>
+  level === "municipality" ? "club" : "operator";
 
 const modelSchema = new Schema(
   {
@@ -40,6 +44,13 @@ const modelSchema = new Schema(
       type: String,
       enum: CLUB_LEVELS,
       required: true,
+    },
+
+    type: {
+      type: String,
+      enum: CLUB_TYPES,
+      required: true,
+      default: "club",
     },
 
     parent: {
@@ -140,6 +151,16 @@ const modelSchema = new Schema(
           ref: "Users",
         },
       },
+      coordinator: {
+        user: {
+          type: mongoose.Schema.Types.ObjectId,
+          ref: "Users",
+        },
+        source: {
+          type: String,
+          enum: ["secretary", "owner"],
+        },
+      },
     },
     ownershipType: {
       type: String,
@@ -185,6 +206,29 @@ const modelSchema = new Schema(
     timestamps: true,
   },
 );
+
+modelSchema.pre("validate", function resolveCoordinator(next) {
+  this.type = getClubTypeFromLevel(this.level);
+
+  const secretaryUser = this.management?.secretary?.user || null;
+  const ownerUser = this.management?.owner?.user || null;
+  const coordinatorUser = secretaryUser || ownerUser || null;
+
+  if (!this.management) {
+    this.management = {};
+  }
+
+  if (coordinatorUser) {
+    this.management.coordinator = {
+      user: coordinatorUser,
+      source: secretaryUser ? "secretary" : "owner",
+    };
+  } else if (this.management.coordinator) {
+    this.management.coordinator = undefined;
+  }
+
+  next();
+});
 
 modelSchema.index({ level: 1, parent: 1, deletedAt: 1 });
 modelSchema.index({
