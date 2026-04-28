@@ -9,6 +9,7 @@ import {
   findLevels,
   findPyramid,
   findTree,
+  uploadClubLogo,
 } from "../controllers/Clubs.js";
 
 const router = express.Router();
@@ -19,6 +20,7 @@ router.get("/pyramid", findPyramid);
 router.get("/:id/tree", findTree);
 router.get("/:id/children", findChildren);
 router.get("/:id", findOne);
+router.put("/:id/logo", uploadClubLogo);
 router.post("/", createClub);
 router.put("/:id", updateClub);
 router.delete("/:id", deleteClub);

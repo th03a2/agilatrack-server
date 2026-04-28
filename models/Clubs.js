@@ -199,6 +199,12 @@ const modelSchema = new Schema(
       ig: { type: String },
       x: { type: String },
     },
+    logo: {
+      url: { type: String },
+      publicId: { type: String },
+      version: { type: String },
+      updatedAt: { type: Date },
+    },
 
     deletedAt: { type: String },
   },

@@ -10,8 +10,6 @@ export const AFFILIATION_STATUSES = [
   "deactivated",
 ];
 
-export const AFFILIATION_TYPES = ["racer", "officer", "organizer", "staff"];
-
 const deactivationSchema = new Schema(
   {
     by: {
@@ -71,13 +69,6 @@ const modelSchema = new Schema(
         "Member code must use uppercase letters, numbers, dashes, and dots only.",
       ],
     },
-    membershipType: {
-      type: String,
-      enum: AFFILIATION_TYPES,
-      default: "racer",
-      trim: true,
-      lowercase: true,
-    },
     roles: [
       {
         type: String,
@@ -117,7 +108,6 @@ const modelSchema = new Schema(
         uppercase: true,
       },
     },
-    tagline: { type: String },
     approval: {
       type: approvalSchema,
       default: () => ({}),
@@ -180,13 +170,7 @@ modelSchema.pre("validate", function normalizeAffiliation(next) {
   next();
 });
 
-modelSchema.index(
-  { user: 1, club: 1 },
-  {
-    unique: true,
-    partialFilterExpression: { deletedAt: { $exists: false } },
-  },
-);
+modelSchema.index({ user: 1, club: 1, status: 1, createdAt: -1 });
 modelSchema.index(
   { club: 1, memberCode: 1 },
   {

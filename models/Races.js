@@ -66,6 +66,25 @@ const modelSchema = new Schema(
       default: "old bird",
       lowercase: true,
     },
+    entryFee: {
+      amount: {
+        type: Number,
+        min: 0,
+        default: 0,
+      },
+      currency: {
+        type: String,
+        trim: true,
+        uppercase: true,
+        default: "PHP",
+        minlength: 3,
+        maxlength: 8,
+      },
+    },
+    minimumRacers: {
+      type: Number,
+      min: 1,
+    },
     raceDate: {
       type: Date,
       required: true,

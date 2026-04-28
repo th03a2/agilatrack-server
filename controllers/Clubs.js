@@ -1,10 +1,71 @@
 import mongoose from "mongoose";
+import path from "node:path";
+import { fileURLToPath } from "node:url";
+import dotenv from "dotenv";
 import Clubs, {
   CLUB_LEVELS,
   CLUB_PARENT_LEVEL,
   CLUB_TYPES,
   getClubTypeFromLevel,
 } from "../models/Clubs.js";
+import { v2 as cloudinary } from "cloudinary";
+
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
+const ENV_PATH = path.join(__dirname, "..", ".env");
+
+const getCloudinaryConfig = () => ({
+  cloudName: String(process.env.CLOUDINARY_CLOUD_NAME || "").trim(),
+  apiKey: String(process.env.CLOUDINARY_API_KEY || "").trim(),
+  apiSecret: String(process.env.CLOUDINARY_API_SECRET || "").trim(),
+});
+
+const isCloudinaryConfigured = () =>
+  Boolean(
+    getCloudinaryConfig().cloudName &&
+      getCloudinaryConfig().apiKey &&
+      getCloudinaryConfig().apiSecret,
+  );
+
+const applyCloudinaryConfig = () => {
+  const { cloudName, apiKey, apiSecret } = getCloudinaryConfig();
+  if (!cloudName || !apiKey || !apiSecret) return false;
+
+  cloudinary.config({
+    cloud_name: cloudName,
+    api_key: apiKey,
+    api_secret: apiSecret,
+  });
+
+  return true;
+};
+
+const refreshCloudinaryConfig = () => {
+  dotenv.config({ path: ENV_PATH, override: true, quiet: true });
+  return applyCloudinaryConfig();
+};
+
+const encodePathSegment = (value = "") =>
+  String(value || "")
+    .trim()
+    .toLowerCase()
+    .replace(/[^a-z0-9._-]+/g, "-")
+    .replace(/^-+|-+$/g, "") || "unknown";
+
+const getCloudinaryErrorDetails = (error) => {
+  const nestedError = error?.error && typeof error.error === "object" ? error.error : null;
+  const rawMessage =
+    nestedError?.message ||
+    error?.message ||
+    "Club logo upload failed";
+
+  return {
+    message: rawMessage,
+    code: nestedError?.http_code || error?.http_code || null,
+  };
+};
+
+refreshCloudinaryConfig();
 
 const sendError = (res, error, status = 400) =>
   res.status(status).json({ error: error.message || error });
@@ -203,6 +264,71 @@ export const findChildren = async (req, res) => {
     res.json({ success: "Club children fetched successfully", payload });
   } catch (error) {
     sendError(res, error);
+  }
+};
+
+export const uploadClubLogo = async (req, res) => {
+  try {
+    const cloudinaryReady = refreshCloudinaryConfig();
+    if (!cloudinaryReady || !isCloudinaryConfigured()) {
+      return res.status(500).json({
+        error: "Cloudinary is not configured",
+        message:
+          "Add CLOUDINARY_CLOUD_NAME, CLOUDINARY_API_KEY, and CLOUDINARY_API_SECRET to server/.env.",
+      });
+    }
+
+    const club = await Clubs.findById(req.params.id).select(
+      "_id code abbr name logo",
+    );
+    if (!club) {
+      return res.status(404).json({ error: "Club not found" });
+    }
+
+    const source = String(req.body?.source || "").trim();
+    if (!source.startsWith("data:image/")) {
+      return res.status(400).json({
+        error: "Invalid image payload",
+        message: "Club logo upload expects a base64 image data URL.",
+      });
+    }
+
+    const safeCode = encodePathSegment(club.code || club.abbr || club.name);
+    const uploadResult = await cloudinary.uploader.upload(source, {
+      folder: `clubs/${safeCode}`,
+      public_id: "logo",
+      resource_type: "image",
+      overwrite: true,
+      invalidate: true,
+    });
+
+    const logo = {
+      url: uploadResult.secure_url,
+      publicId: uploadResult.public_id,
+      version: uploadResult.version ? String(uploadResult.version) : "",
+      updatedAt: new Date(),
+    };
+
+    const payload = await Clubs.findByIdAndUpdate(
+      req.params.id,
+      { $set: { logo } },
+      {
+        new: true,
+        runValidators: false,
+      },
+    );
+
+    return res.status(201).json({
+      success: "Club logo uploaded successfully",
+      payload,
+    });
+  } catch (error) {
+    const details = getCloudinaryErrorDetails(error);
+
+    return res.status(500).json({
+      error: details.message,
+      code: details.code,
+    });
   }
 };
 

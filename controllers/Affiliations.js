@@ -1,12 +1,27 @@
 import Affiliations from "../models/Affiliations.js";
+import Users from "../models/Users.js";
 
 const sendError = (res, error, status = 400) =>
   res.status(status).json({ error: error.message || error });
 
 const populateAffiliation = (query) =>
   query
-    .populate("user", "fullName email mobile pid isMale")
-    .populate("club", "name code abbr level location")
+    .populate("user", "fullName email mobile pid isMale address")
+    .populate({
+      path: "club",
+      select:
+        "name code abbr level type location parent lid bid social logo management",
+      populate: [
+        {
+          path: "parent",
+          select: "name code abbr level type location",
+        },
+        {
+          path: "management.secretary.user",
+          select: "fullName email mobile pid isMale",
+        },
+      ],
+    })
     .populate("primaryLoft", "name code coordinates address status")
     .populate("lofts", "name code coordinates address status");
 
@@ -67,6 +82,21 @@ export const findOne = async (req, res) => {
 
 export const createAffiliation = async (req, res) => {
   try {
+    const applicant = await Users.findById(req.body?.user)
+      .select("pid files.profile")
+      .lean();
+
+    const hasProfilePhoto = Boolean(
+      applicant?.pid || applicant?.files?.profile,
+    );
+
+    if (!hasProfilePhoto) {
+      return res.status(400).json({
+        error:
+          "Profile photo is required before submitting a club application.",
+      });
+    }
+
     const created = await Affiliations.create(req.body);
     const payload = await populateAffiliation(
       Affiliations.findById(created._id),
@@ -89,7 +119,22 @@ export const updateAffiliation = async (req, res) => {
       return res.status(404).json({ error: "Affiliation not found" });
     }
 
+    const rejectionReason = String(req.body?.approval?.reason || "").trim();
+    const isRejectedUpdate = String(req.body?.status || "").trim() === "rejected";
+
     affiliation.set(req.body);
+
+    if (isRejectedUpdate && rejectionReason) {
+      const existingRemarks = Array.isArray(affiliation.remarks)
+        ? affiliation.remarks
+        : [];
+      const nextRemark = `Declined: ${rejectionReason}`;
+
+      if (!existingRemarks.includes(nextRemark)) {
+        affiliation.remarks = [...existingRemarks, nextRemark];
+      }
+    }
+
     await affiliation.save();
 
     const payload = await populateAffiliation(
