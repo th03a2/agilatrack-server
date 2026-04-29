@@ -27,16 +27,39 @@ const modelSchema = new Schema(
       type: Schema.Types.ObjectId,
       ref: "Users",
     },
+    device: {
+      deviceId: { type: String, trim: true },
+      label: { type: String, trim: true },
+      brand: { type: String, trim: true },
+      manufacturer: { type: String, trim: true },
+      modelName: { type: String, trim: true },
+      deviceName: { type: String, trim: true },
+      osName: { type: String, trim: true },
+      osVersion: { type: String, trim: true },
+      osBuildId: { type: String, trim: true },
+      platformApiLevel: { type: Number },
+      isDevice: { type: Boolean, default: true },
+      capturedAt: { type: Date },
+      role: {
+        type: String,
+        enum: ["loft_registration", "race_nfc_scanner"],
+        default: "race_nfc_scanner",
+      },
+    },
     coordinates: {
       latitude: {
         type: Number,
-        required: true,
+        required() {
+          return this.status !== "draft";
+        },
         min: -90,
         max: 90,
       },
       longitude: {
         type: Number,
-        required: true,
+        required() {
+          return this.status !== "draft";
+        },
         min: -180,
         max: 180,
       },
@@ -118,6 +141,8 @@ modelSchema.pre("validate", function setGeoPoint(next) {
       type: "Point",
       coordinates: [longitude, latitude],
     };
+  } else {
+    this.geo = undefined;
   }
 
   next();
