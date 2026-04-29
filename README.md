@@ -11,6 +11,7 @@ Create `server/.env` from the example file:
 ```env
 MONGO_URI=your_mongodb_connection_string
 PORT=5000
+HOST=0.0.0.0
 ```
 
 Install dependencies and run the API:
@@ -34,6 +35,7 @@ If the backend works on one computer but not another, the most common causes are
 - The teammate's IP address is not allowed in MongoDB Atlas Network Access.
 - The Atlas database username or password is different from the connection string.
 - Port `5000` is already in use on their machine.
+- The API is only listening on `localhost`; for phones on the same Wi-Fi, keep `HOST=0.0.0.0`.
 
 ## Seed Data
 

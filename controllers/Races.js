@@ -1,11 +1,18 @@
-import Races from "../models/Races.js";
+import Races, { normalizeRaceCategory } from "../models/Races.js";
 
 const sendError = (res, error, status = 400) =>
   res.status(status).json({ error: error.message || error });
 
 const populateRace = (query) =>
   query
-    .populate("club", "name code abbr level location")
+    .populate({
+      path: "club",
+      select: "name code abbr level type location parent",
+      populate: {
+        path: "parent",
+        select: "name code abbr level type location",
+      },
+    })
     .populate("organizer", "fullName email mobile pid");
 
 const buildRaceQuery = (query = {}) => {
@@ -27,7 +34,7 @@ const buildRaceQuery = (query = {}) => {
   if (organizer) dbQuery.organizer = organizer;
   if (status) dbQuery.status = status;
   if (code) dbQuery.code = { $regex: code, $options: "i" };
-  if (category) dbQuery.category = category;
+  if (category) dbQuery.category = normalizeRaceCategory(category);
   if (region) dbQuery["departure.address.region"] = region;
   if (province) dbQuery["departure.address.province"] = province;
   if (municipality) dbQuery["departure.address.municipality"] = municipality;

@@ -27,6 +27,7 @@ dotenv.config({ path: path.join(__dirname, ".env"), quiet: true });
 
 const app = express();
 const PORT = process.env.PORT || 5000;
+const HOST = process.env.HOST || "0.0.0.0";
 const MONGO_URI = process.env.MONGO_URI;
 
 app.use(cors());
@@ -193,8 +194,8 @@ mongoose
   .then(() => {
     console.log("Mongo connected");
 
-    app.listen(PORT, () => {
-      console.log(`Server running on ${PORT}`);
+    app.listen(PORT, HOST, () => {
+      console.log(`Server running on ${HOST}:${PORT}`);
     });
   })
   .catch((err) => {

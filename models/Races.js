@@ -13,6 +13,23 @@ export const RACE_STATUSES = [
   "cancelled",
 ];
 
+export const RACE_CATEGORIES = ["training", "race", "derby"];
+
+export const normalizeRaceCategory = (value) => {
+  const normalized = String(value || "")
+    .trim()
+    .toLowerCase();
+
+  if (!normalized) return "race";
+  if (normalized === "competition") return "race";
+  if (normalized.includes("training")) return "training";
+  if (["derby", "futurity"].includes(normalized)) return "derby";
+  if (["old bird", "young bird", "open", "race"].includes(normalized))
+    return "race";
+
+  return normalized;
+};
+
 const coordinateSchema = new Schema(
   {
     latitude: {
@@ -63,8 +80,10 @@ const modelSchema = new Schema(
     category: {
       type: String,
       trim: true,
-      default: "old bird",
+      enum: RACE_CATEGORIES,
+      default: "race",
       lowercase: true,
+      set: normalizeRaceCategory,
     },
     entryFee: {
       amount: {

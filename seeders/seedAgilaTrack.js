@@ -454,7 +454,7 @@ const raceSeeds = [
     organizerKey: "ana",
     code: "CFC-2026-TAL-100",
     name: "Cabanatuan Flyers Talavera 100KM Training Race",
-    category: "old bird",
+    category: "training",
     raceDate: new Date("2026-05-03T06:00:00+08:00"),
     booking: {
       opensAt: new Date("2026-04-20T08:00:00+08:00"),
@@ -528,7 +528,7 @@ const raceSeeds = [
     organizerKey: "juan",
     code: "CFC-2026-GUI-150",
     name: "Cabanatuan Flyers Guimba 150KM Futurity",
-    category: "young bird",
+    category: "derby",
     raceDate: new Date("2026-05-17T06:15:00+08:00"),
     booking: {
       opensAt: new Date("2026-05-04T08:00:00+08:00"),
