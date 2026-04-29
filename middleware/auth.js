@@ -1,6 +1,14 @@
 import Affiliations from "../models/Affiliations.js";
 import Users from "../models/Users.js";
+<<<<<<< Updated upstream
 import { buildAccessFlags, extractAuthToken, verifyAuthToken } from "../utils/auth.js";
+=======
+import {
+  buildAccessFlags,
+  extractAuthToken,
+  verifyAuthToken,
+} from "../utils/auth.js";
+>>>>>>> Stashed changes
 import { AppError } from "../utils/appError.js";
 
 const AUTH_USER_SELECT =

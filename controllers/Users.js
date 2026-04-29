@@ -57,6 +57,7 @@ const buildUserQuery = (query = {}) => {
   if (search) {
     dbQuery.$or = [
       { email: { $regex: search, $options: "i" } },
+      { username: { $regex: search, $options: "i" } },
       { "fullName.fname": { $regex: search, $options: "i" } },
       { "fullName.mname": { $regex: search, $options: "i" } },
       { "fullName.lname": { $regex: search, $options: "i" } },

@@ -105,4 +105,7 @@ export const createResourceCode = (prefix, value) =>
     .replace(/[^A-Za-z0-9]/g, "")
     .slice(-8)
     .toUpperCase() || "00000000"}`;
+<<<<<<< Updated upstream
 
+=======
+>>>>>>> Stashed changes

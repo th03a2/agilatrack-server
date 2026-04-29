@@ -30,11 +30,19 @@ const modelSchema = new mongoose.Schema(
   },
 );
 
+<<<<<<< Updated upstream
 modelSchema.query.byUser = function (user) {
   return this.where({ user });
 };
 
 modelSchema.query.byClub = function (club) {
+=======
+modelSchema.query.byUser = function byUser(user) {
+  return this.where({ user });
+};
+
+modelSchema.query.byClub = function byClub(club) {
+>>>>>>> Stashed changes
   return this.where({ club });
 };
 

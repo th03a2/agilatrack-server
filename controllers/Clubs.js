@@ -195,6 +195,74 @@ export const findChildren = async (req, res) => {
   }
 };
 
+<<<<<<< Updated upstream
+=======
+export const uploadClubLogo = async (req, res) => {
+  try {
+    const cloudinaryReady = refreshCloudinaryConfig();
+    if (!cloudinaryReady || !isCloudinaryConfigured()) {
+      return res.status(500).json({
+        error: "Cloudinary is not configured",
+        message:
+          "Add CLOUDINARY_CLOUD_NAME, CLOUDINARY_API_KEY, and CLOUDINARY_API_SECRET to server/.env.",
+      });
+    }
+
+    const club = await Clubs.findById(req.params.id).select(
+      "_id code abbr name logo clubLogo",
+    );
+    if (!club) {
+      return res.status(404).json({ error: "Club not found" });
+    }
+
+    const source = String(req.body?.source || "").trim();
+    if (!source.startsWith("data:image/")) {
+      return res.status(400).json({
+        error: "Invalid image payload",
+        message: "Club logo upload expects a base64 image data URL.",
+      });
+    }
+
+    const safeCode = encodePathSegment(club.code || club.abbr || club.name);
+    const uploadResult = await cloudinary.uploader.upload(source, {
+      folder: `clubs/${safeCode}`,
+      public_id: "logo",
+      resource_type: "image",
+      overwrite: true,
+      invalidate: true,
+    });
+
+    const logo = {
+      url: uploadResult.secure_url,
+      publicId: uploadResult.public_id,
+      version: uploadResult.version ? String(uploadResult.version) : "",
+      updatedAt: new Date(),
+    };
+
+    const payload = await Clubs.findByIdAndUpdate(
+      req.params.id,
+      { $set: { clubLogo: uploadResult.secure_url, logo } },
+      {
+        new: true,
+        runValidators: false,
+      },
+    );
+
+    return res.status(201).json({
+      success: "Club logo uploaded successfully",
+      payload,
+    });
+  } catch (error) {
+    const details = getCloudinaryErrorDetails(error);
+
+    return res.status(500).json({
+      error: details.message,
+      code: details.code,
+    });
+  }
+};
+
+>>>>>>> Stashed changes
 export const findPyramid = async (req, res) => {
   try {
     const roots = await Clubs.find({

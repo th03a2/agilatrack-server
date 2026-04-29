@@ -1,3 +1,4 @@
+<<<<<<< Updated upstream
 import mongoose from "mongoose";
 
 const { Schema } = mongoose;
@@ -13,6 +14,13 @@ export const PIGEON_STATUSES = [
   "sold",
   "archived",
 ];
+=======
+export {
+  BIRD_SEXES as PIGEON_SEXES,
+  BIRD_STATUSES as PIGEON_STATUSES,
+  default,
+} from "./Birds.js";
+>>>>>>> Stashed changes
 
 export const PIGEON_HEALTH_STATUSES = [
   "Excellent",
@@ -20,6 +28,7 @@ export const PIGEON_HEALTH_STATUSES = [
   "Fair",
   "Poor",
 ];
+<<<<<<< Updated upstream
 
 const parentSchema = new Schema(
   {
@@ -209,3 +218,5 @@ modelSchema.index({ club: 1, status: 1, createdAt: -1 });
 const Entity = mongoose.model("Pigeons", modelSchema);
 
 export default Entity;
+=======
+>>>>>>> Stashed changes

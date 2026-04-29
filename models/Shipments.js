@@ -97,4 +97,7 @@ modelSchema.index({ "club.club": 1, shipmentStatus: 1, createdAt: -1 });
 const Entity = mongoose.model("Shipments", modelSchema);
 
 export default Entity;
+<<<<<<< Updated upstream
 
+=======
+>>>>>>> Stashed changes

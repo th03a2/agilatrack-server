@@ -1,3 +1,4 @@
+<<<<<<< Updated upstream
 import {
   ensureOwnerOrClubManager,
   hasClubManagementAccess,
@@ -183,3 +184,12 @@ export const deletePigeon = async (req, res) => {
     sendError(res, error);
   }
 };
+=======
+export {
+  createBird as createPigeon,
+  deleteBird as deletePigeon,
+  findAll,
+  findOne,
+  updateBird as updatePigeon,
+} from "./Birds.js";
+>>>>>>> Stashed changes

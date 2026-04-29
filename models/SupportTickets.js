@@ -7,7 +7,18 @@ import {
 
 const { Schema } = mongoose;
 
+<<<<<<< Updated upstream
 const SUPPORT_SEVERITIES = ["slate", "sky", "amber", "emerald", "violet", "rose"];
+=======
+const SUPPORT_SEVERITIES = [
+  "slate",
+  "sky",
+  "amber",
+  "emerald",
+  "violet",
+  "rose",
+];
+>>>>>>> Stashed changes
 
 const modelSchema = new Schema(
   {
@@ -89,4 +100,7 @@ modelSchema.index({ "owner.user": 1, status: 1, createdAt: -1 });
 const Entity = mongoose.model("SupportTickets", modelSchema);
 
 export default Entity;
+<<<<<<< Updated upstream
 
+=======
+>>>>>>> Stashed changes

@@ -11,6 +11,7 @@ export const AFFILIATION_STATUSES = [
 ];
 
 export const AFFILIATION_TYPES = ["racer", "officer", "organizer", "staff"];
+<<<<<<< Updated upstream
 const AFFILIATION_ROLE_IDS = {
   racer: 2,
   officer: 10,
@@ -27,6 +28,8 @@ const normalizeAffiliationRole = (role) => {
 
   return AFFILIATION_ROLE_IDS[String(role).trim().toLowerCase()] || role;
 };
+=======
+>>>>>>> Stashed changes
 
 const deactivationSchema = new Schema(
   {
@@ -104,7 +107,11 @@ const modelSchema = new Schema(
       trim: true,
       lowercase: true,
     },
+<<<<<<< Updated upstream
     roles: [{ type: Number }],
+=======
+    roles: [{ type: Schema.Types.Mixed }],
+>>>>>>> Stashed changes
     mobile: { type: String },
     primaryLoft: {
       type: Schema.Types.ObjectId,
@@ -137,7 +144,11 @@ const modelSchema = new Schema(
         uppercase: true,
       },
     },
+<<<<<<< Updated upstream
     tagline: { type: String },
+=======
+    tagline: { type: String, trim: true },
+>>>>>>> Stashed changes
     application: {
       type: applicationSchema,
       default: () => ({}),

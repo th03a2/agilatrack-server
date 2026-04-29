@@ -1,3 +1,4 @@
+<<<<<<< Updated upstream
 import multer from "multer";
 import path from "node:path";
 import { CloudinaryStorage } from "multer-storage-cloudinary";
@@ -17,6 +18,12 @@ const allowedMimeTypes = new Set([
 ]);
 const allowedExtensions = new Set([".jpg", ".jpeg", ".png", ".webp"]);
 
+=======
+import { configureCloudinary, getCloudinaryStatus } from "../config/cloudinary.js";
+import { env } from "../config/env.js";
+import { AppError } from "../utils/appError.js";
+
+>>>>>>> Stashed changes
 const folderMap = {
   "profile-photo": "profile-photos",
   "valid-id": "valid-ids",
@@ -25,6 +32,42 @@ const folderMap = {
   "announcement-banner": "announcement-banners",
 };
 
+<<<<<<< Updated upstream
+=======
+const dataUrlPattern =
+  /^data:(image\/(?:jpeg|jpg|png|webp));base64,([A-Za-z0-9+/=\r\n]+)$/i;
+
+const parseImagePayload = (source) => {
+  const value = String(source || "").trim();
+  const match = value.match(dataUrlPattern);
+
+  if (!match) {
+    throw new AppError(
+      400,
+      "Invalid image payload. Provide a JPG, JPEG, PNG, or WEBP base64 data URL.",
+    );
+  }
+
+  const mimeType = match[1].toLowerCase();
+  const extension = mimeType.split("/")[1] || "jpg";
+  const base64Body = match[2].replace(/\s+/g, "");
+  const sizeBytes = Buffer.byteLength(base64Body, "base64");
+
+  if (sizeBytes > env.MAX_UPLOAD_FILE_SIZE_BYTES) {
+    throw new AppError(400, "File too large.", {
+      maximumFileSizeMb: env.MAX_UPLOAD_FILE_SIZE_MB,
+    });
+  }
+
+  return {
+    extension: extension === "jpeg" ? "jpg" : extension,
+    mimeType,
+    sizeBytes,
+    source: value,
+  };
+};
+
+>>>>>>> Stashed changes
 const ensureCloudinaryReady = () => {
   const status = configureCloudinary();
 
@@ -36,6 +79,7 @@ const ensureCloudinaryReady = () => {
   }
 };
 
+<<<<<<< Updated upstream
 const validateImageFile = (file) => {
   const mimeType = String(file?.mimetype || "").toLowerCase();
   const extension = path.extname(String(file?.originalname || "")).toLowerCase();
@@ -74,6 +118,8 @@ const imageFileFilter = (req, file, callback) => {
   }
 };
 
+=======
+>>>>>>> Stashed changes
 export const ensureCloudinaryConfigured = (req, res, next) => {
   try {
     const status = getCloudinaryStatus();
@@ -91,6 +137,7 @@ export const ensureCloudinaryConfigured = (req, res, next) => {
   }
 };
 
+<<<<<<< Updated upstream
 export const createUploadMiddleware = (variant) =>
   multer({
     storage: createStorage(variant),
@@ -99,3 +146,27 @@ export const createUploadMiddleware = (variant) =>
       fileSize: env.MAX_UPLOAD_FILE_SIZE_BYTES,
     },
   });
+=======
+export const createUploadMiddleware = (variant) => (req, res, next) => {
+  try {
+    ensureCloudinaryReady();
+
+    const parsed = parseImagePayload(req.body?.source);
+
+    req.upload = {
+      ...parsed,
+      assetType: variant,
+      birdId: String(req.body?.birdId || "").trim(),
+      clubId: String(req.body?.clubId || "").trim(),
+      folder: `agilatrack/${folderMap[variant] || "general"}`,
+      label: String(req.body?.label || "").trim(),
+      photoType: String(req.body?.photoType || "profile").trim().toLowerCase(),
+      userId: String(req.body?.userId || "").trim(),
+    };
+
+    next();
+  } catch (error) {
+    next(error);
+  }
+};
+>>>>>>> Stashed changes

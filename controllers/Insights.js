@@ -18,10 +18,14 @@ const formatDate = (value) =>
       })
     : "";
 
+<<<<<<< Updated upstream
 const formatDateTime = (value) =>
   value
     ? new Date(value).toISOString()
     : null;
+=======
+const formatDateTime = (value) => (value ? new Date(value).toISOString() : null);
+>>>>>>> Stashed changes
 
 const buildFullName = (fullName = {}, fallback = "Unknown user") => {
   const value = [
@@ -44,11 +48,15 @@ const buildClubName = (club = {}, fallback = "No club linked") =>
   club?.name || club?.abbr || club?.code || fallback;
 
 const buildClubLocation = (location = {}) =>
+<<<<<<< Updated upstream
   [
     location?.municipality,
     location?.province,
     location?.region,
   ]
+=======
+  [location?.municipality, location?.province, location?.region]
+>>>>>>> Stashed changes
     .filter(Boolean)
     .join(", ");
 

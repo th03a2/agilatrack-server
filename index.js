@@ -21,9 +21,16 @@ import {
 import loftsRouter from "./routes/lofts.js";
 import { errorHandler, notFoundHandler } from "./middleware/errorHandler.js";
 import officersRouter from "./routes/officers.js";
+<<<<<<< Updated upstream
 import ordersRouter from "./routes/orders.js";
 import paymentsRouter from "./routes/payments.js";
 import pigeonsRouter from "./routes/pigeons.js";
+=======
+import birdsRouter from "./routes/birds.js";
+import avianHealthProfilesRouter from "./routes/avianHealthProfiles.js";
+import ordersRouter from "./routes/orders.js";
+import paymentsRouter from "./routes/payments.js";
+>>>>>>> Stashed changes
 import payoutsRouter from "./routes/payouts.js";
 import productsRouter from "./routes/products.js";
 import raceEntriesRouter from "./routes/raceEntries.js";
@@ -32,8 +39,25 @@ import sellersRouter from "./routes/sellers.js";
 import shipmentsRouter from "./routes/shipments.js";
 import supportRouter from "./routes/support.js";
 import uploadRouter from "./routes/upload.js";
+<<<<<<< Updated upstream
 import { apiRoutes, logApiRoutes } from "./routes/index.js";
 import usersRouter from "./routes/users.js";
+=======
+import { apiRoutes, logApiRoutes, logNbiRoutes, nbiRoutes } from "./routes/index.js";
+import usersRouter from "./routes/users.js";
+import walletsRouter from "./routes/wallets.js";
+import { getAllowedOrigins, corsOptions } from "./config/cors.js";
+import { getCloudinaryStatus } from "./config/cloudinary.js";
+import {
+  connectDatabase,
+  getDatabaseHealth,
+  logMongoStartupError,
+} from "./config/database.js";
+import { env, validateCriticalEnv } from "./config/env.js";
+import { errorHandler, notFoundHandler } from "./middleware/errorHandler.js";
+import { sanitizeRequest } from "./middleware/sanitizeRequest.js";
+import { apiLimiter, helmetMiddleware } from "./middleware/security.js";
+>>>>>>> Stashed changes
 
 dns.setServers(["1.1.1.1", "8.8.8.8"]);
 
@@ -51,6 +75,7 @@ app.use(express.json({ limit: env.REQUEST_BODY_LIMIT }));
 app.use(express.urlencoded({ extended: true, limit: env.REQUEST_BODY_LIMIT }));
 app.use(sanitizeRequest);
 app.use("/api", apiLimiter);
+<<<<<<< Updated upstream
 
 app.use("/api/auth", authRouter);
 app.use("/api/affiliations", affiliationsRouter);
@@ -71,6 +96,40 @@ app.use("/api/shipments", shipmentsRouter);
 app.use("/api/support", supportRouter);
 app.use("/api/upload", uploadRouter);
 app.use("/api/users", usersRouter);
+=======
+app.use("/nbi", apiLimiter);
+
+const registerRouteGroup = (prefix) => {
+  app.use(`${prefix}/auth`, authRouter);
+  app.use(`${prefix}/commerce`, commerceRouter);
+  app.use(`${prefix}/affiliations`, affiliationsRouter);
+  app.use(`${prefix}/club-management`, clubManagementRouter);
+  app.use(`${prefix}/clubs`, clubsRouter);
+  app.use(`${prefix}/crates`, cratesRouter);
+  app.use(`${prefix}/lofts`, loftsRouter);
+  app.use(`${prefix}/officers`, officersRouter);
+  app.use(`${prefix}/birds`, birdsRouter);
+  app.use(`${prefix}/ahp`, avianHealthProfilesRouter);
+  app.use(`${prefix}/avian-health-profiles`, avianHealthProfilesRouter);
+  app.use(`${prefix}/pigeons`, birdsRouter);
+  app.use(`${prefix}/pegions`, birdsRouter);
+  app.use(`${prefix}/orders`, ordersRouter);
+  app.use(`${prefix}/payments`, paymentsRouter);
+  app.use(`${prefix}/payouts`, payoutsRouter);
+  app.use(`${prefix}/products`, productsRouter);
+  app.use(`${prefix}/race-entries`, raceEntriesRouter);
+  app.use(`${prefix}/races`, racesRouter);
+  app.use(`${prefix}/sellers`, sellersRouter);
+  app.use(`${prefix}/shipments`, shipmentsRouter);
+  app.use(`${prefix}/support`, supportRouter);
+  app.use(`${prefix}/upload`, uploadRouter);
+  app.use(`${prefix}/users`, usersRouter);
+  app.use(`${prefix}/wallets`, walletsRouter);
+};
+
+registerRouteGroup("/api");
+registerRouteGroup("/nbi");
+>>>>>>> Stashed changes
 
 const buildHealthPayload = () => ({
   environment: env.NODE_ENV,
@@ -78,6 +137,16 @@ const buildHealthPayload = () => ({
   timestamp: new Date().toISOString(),
   uptimeSeconds: Math.round(process.uptime()),
   database: getDatabaseHealth(),
+<<<<<<< Updated upstream
+=======
+});
+
+app.get("/nbi/routes", (req, res) => {
+  res.json({
+    success: "NBI routes fetched successfully",
+    payload: nbiRoutes,
+  });
+>>>>>>> Stashed changes
 });
 
 app.get("/api/routes", (req, res) => {
@@ -105,16 +174,31 @@ app.get("/", (req, res) => {
     payload.endpoints = {
       affiliations: "/api/affiliations",
       auth: "/api/auth/login",
+<<<<<<< Updated upstream
       clubs: "/api/clubs",
+=======
+      authSession: "/api/auth/me",
+      clubManagement: "/api/club-management",
+      clubs: "/api/clubs",
+      commerce: "/api/commerce",
+>>>>>>> Stashed changes
       crates: "/api/crates",
       clubPyramid: "/api/clubs/pyramid",
       clubLevels: "/api/clubs/meta/levels",
       health: "/health",
       lofts: "/api/lofts",
       officers: "/api/officers",
+<<<<<<< Updated upstream
       orders: "/api/orders",
       payments: "/api/payments",
       pigeons: "/api/pigeons",
+=======
+      birds: "/api/birds",
+      pigeons: "/api/pigeons",
+      avianHealthProfiles: "/api/ahp",
+      orders: "/api/orders",
+      payments: "/api/payments",
+>>>>>>> Stashed changes
       payouts: "/api/payouts",
       products: "/api/products",
       raceEntries: "/api/race-entries",
@@ -125,6 +209,10 @@ app.get("/", (req, res) => {
       support: "/api/support",
       upload: "/api/upload/profile-photo",
       users: "/api/users",
+<<<<<<< Updated upstream
+=======
+      wallets: "/api/wallets",
+>>>>>>> Stashed changes
     };
   }
 
@@ -136,6 +224,11 @@ app.get("/", (req, res) => {
 
 if (!env.IS_PRODUCTION) {
   logApiRoutes();
+<<<<<<< Updated upstream
+=======
+  logNbiRoutes();
+  console.log("Allowed CORS origins:", getAllowedOrigins());
+>>>>>>> Stashed changes
   console.log("Cloudinary status:", getCloudinaryStatus());
 }
 

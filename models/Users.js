@@ -153,16 +153,23 @@ const userSchema = new Schema(
     ],
     siblings: [{ type: Schema.Types.ObjectId, ref: "Users" }],
     credentials: {
+<<<<<<< Updated upstream
       //Post Graduate Degree
+=======
+>>>>>>> Stashed changes
       pgd: { type: String },
       specialization: { type: String },
       minor: { type: String },
       lrn: { type: String },
       psa: { type: String },
+<<<<<<< Updated upstream
       // Pantawid Pamilyang Pilipino Program (4P's)
       pppp: { type: String },
 
       //birth certificate
+=======
+      pppp: { type: String },
+>>>>>>> Stashed changes
       bc: { type: String },
     },
     mobile: { type: String },
@@ -172,6 +179,13 @@ const userSchema = new Schema(
       lowercase: true,
       default: "regular",
     },
+    state: [
+      {
+        type: String,
+        trim: true,
+        lowercase: true,
+      },
+    ],
     isMale: {
       type: Boolean,
       default: false,
@@ -217,9 +231,14 @@ const userSchema = new Schema(
         },
       },
       bt: { type: String }, //blood Type
+<<<<<<< Updated upstream
       ip: { type: String }, //Indigenous personal
       pwd: { type: String }, // person with disability
       //Mother Tongue
+=======
+      ip: { type: String },
+      pwd: { type: String },
+>>>>>>> Stashed changes
       mt: { type: String },
     },
 

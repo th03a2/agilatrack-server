@@ -1,8 +1,12 @@
 import mongoose from "mongoose";
+<<<<<<< Updated upstream
 import {
   baseSchemaOptions,
   clubSummarySchema,
 } from "./operationsShared.js";
+=======
+import { baseSchemaOptions, clubSummarySchema } from "./operationsShared.js";
+>>>>>>> Stashed changes
 
 const { Schema } = mongoose;
 
@@ -81,4 +85,7 @@ modelSchema.index({ "club.club": 1, sellerStatus: 1, createdAt: -1 });
 const Entity = mongoose.model("Sellers", modelSchema);
 
 export default Entity;
+<<<<<<< Updated upstream
 
+=======
+>>>>>>> Stashed changes

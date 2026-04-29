@@ -1,4 +1,5 @@
 export const apiRoutes = [
+<<<<<<< Updated upstream
   { path: "/", description: "API health and endpoint summary" },
   { path: "/health", description: "Root health check" },
   { path: "/api/routes", description: "List available API route groups" },
@@ -26,9 +27,89 @@ export const apiRoutes = [
   { path: "/api/sellers", description: "Manage seller directories and club commerce contacts" },
   { path: "/api/shipments", description: "Manage shipment and race-logistics records" },
   { path: "/api/support", description: "Manage support watchlists and operational tickets" },
+=======
+  { path: "/", description: "API health and endpoint summary" },
+  { path: "/health", description: "Root health check" },
+  { path: "/api/routes", description: "List available API route groups" },
+  { path: "/api/auth/login", description: "Authenticate users with email and password" },
+  { path: "/api/auth/me", description: "Validate the current session token" },
+  { path: "/api/auth/validateRefresh", description: "Validate an existing session token" },
+  { path: "/api/commerce", description: "Manage commerce wallets, fees, receipts, and approvals" },
+  { path: "/api/affiliations", description: "Manage user club memberships and racing profiles" },
+  { path: "/api/club-management", description: "Manage club owners, secretaries, and club management records" },
+  { path: "/api/clubs", description: "Manage clubs, hierarchy, pyramid, children, and club details" },
+  { path: "/api/crates", description: "Manage crate inventory, assignments, capacity, seals, and condition checks" },
+  { path: "/api/lofts", description: "Manage lofts and loft location details" },
+  { path: "/api/officers", description: "Legacy alias for /api/club-management" },
+  { path: "/api/birds", description: "Manage bird profiles, ownership, and pedigree details" },
+  { path: "/api/ahp", description: "Manage Avian Health Profile records, treatments, and health history" },
+  { path: "/api/avian-health-profiles", description: "Alias for /api/ahp" },
+  { path: "/api/pigeons", description: "Legacy alias for /api/birds" },
+  { path: "/api/pegions", description: "Legacy alias for /api/birds" },
+  { path: "/api/race-entries", description: "Manage race entry booking, check-in, boarding, departure, arrival, and ranking" },
+  { path: "/api/races", description: "Manage race events, booking windows, and departure details" },
+  { path: "/api/upload/profile-photo", description: "Upload profile photos to Cloudinary using a base64 data URL" },
+  { path: "/api/upload/valid-id", description: "Upload valid ID images to Cloudinary using a base64 data URL" },
+  { path: "/api/upload/club-logo", description: "Upload club logos to Cloudinary using a base64 data URL" },
+  { path: "/api/upload/bird-image", description: "Upload bird photos to Cloudinary using a base64 data URL" },
+  { path: "/api/upload/announcement-banner", description: "Upload announcement banners to Cloudinary using a base64 data URL" },
+  { path: "/api/orders", description: "Manage order records and race-entry transaction flows" },
+  { path: "/api/payments", description: "Manage payment verification queues and finance records" },
+  { path: "/api/payouts", description: "Manage payout records and result-based prize releases" },
+  { path: "/api/products", description: "Manage product and inventory catalog records" },
+  { path: "/api/sellers", description: "Manage seller directories and club commerce contacts" },
+  { path: "/api/shipments", description: "Manage shipment and race-logistics records" },
+  { path: "/api/support", description: "Manage support watchlists and operational tickets" },
+  { path: "/api/users", description: "Manage users and user profiles" },
+  { path: "/api/wallets", description: "Manage coordinator and fancier wallets, load transfers, fees, and recharge requests" },
+];
+
+export const nbiRoutes = [
+  { path: "/", description: "API health and endpoint summary" },
+  { path: "/nbi/routes", description: "List available NBI route groups" },
+  { path: "/nbi/auth/login", description: "Authenticate users with email and password" },
+  { path: "/nbi/auth/me", description: "Validate the current session token" },
+  { path: "/nbi/auth/validateRefresh", description: "Validate an existing session token" },
+  { path: "/nbi/commerce", description: "Manage commerce wallets, fees, receipts, and approvals" },
+  { path: "/nbi/affiliations", description: "Manage user club memberships and racing profiles" },
+  { path: "/nbi/club-management", description: "Manage club owners, secretaries, and club management records" },
+  { path: "/nbi/clubs", description: "Manage clubs, hierarchy, pyramid, children, and club details" },
+  { path: "/nbi/crates", description: "Manage crate inventory, assignments, capacity, seals, and condition checks" },
+  { path: "/nbi/lofts", description: "Manage lofts and loft location details" },
+  { path: "/nbi/officers", description: "Legacy alias for /nbi/club-management" },
+  { path: "/nbi/birds", description: "Manage bird profiles, ownership, and pedigree details" },
+  { path: "/nbi/ahp", description: "Manage Avian Health Profile records, treatments, and health history" },
+  { path: "/nbi/avian-health-profiles", description: "Alias for /nbi/ahp" },
+  { path: "/nbi/pigeons", description: "Legacy alias for /nbi/birds" },
+  { path: "/nbi/pegions", description: "Legacy alias for /nbi/birds" },
+  { path: "/nbi/race-entries", description: "Manage race entry booking, check-in, boarding, departure, arrival, and ranking" },
+  { path: "/nbi/races", description: "Manage race events, booking windows, and departure details" },
+  { path: "/nbi/upload/profile-photo", description: "Upload profile photos to Cloudinary using a base64 data URL" },
+  { path: "/nbi/upload/valid-id", description: "Upload valid ID images to Cloudinary using a base64 data URL" },
+  { path: "/nbi/upload/club-logo", description: "Upload club logos to Cloudinary using a base64 data URL" },
+  { path: "/nbi/upload/bird-image", description: "Upload bird photos to Cloudinary using a base64 data URL" },
+  { path: "/nbi/upload/announcement-banner", description: "Upload announcement banners to Cloudinary using a base64 data URL" },
+  { path: "/nbi/orders", description: "Manage order records and race-entry transaction flows" },
+  { path: "/nbi/payments", description: "Manage payment verification queues and finance records" },
+  { path: "/nbi/payouts", description: "Manage payout records and result-based prize releases" },
+  { path: "/nbi/products", description: "Manage product and inventory catalog records" },
+  { path: "/nbi/sellers", description: "Manage seller directories and club commerce contacts" },
+  { path: "/nbi/shipments", description: "Manage shipment and race-logistics records" },
+  { path: "/nbi/support", description: "Manage support watchlists and operational tickets" },
+  { path: "/nbi/users", description: "Manage users and user profiles" },
+  { path: "/nbi/wallets", description: "Manage coordinator and fancier wallets, load transfers, fees, and recharge requests" },
+>>>>>>> Stashed changes
 ];
 
 export const logApiRoutes = () => {
   console.log("Available API routes:");
   console.table(apiRoutes.map(({ path, description }) => ({ path, description })));
+<<<<<<< Updated upstream
+=======
+};
+
+export const logNbiRoutes = () => {
+  console.log("Available NBI routes:");
+  console.table(nbiRoutes.map(({ path, description }) => ({ path, description })));
+>>>>>>> Stashed changes
 };

@@ -28,7 +28,13 @@ const getMongoConnectionSummary = (uri) => {
 export const logMongoStartupError = (error) => {
   if (
     error?.name === "MongooseServerSelectionError" ||
+<<<<<<< Updated upstream
     /querySrv|ENOTFOUND|ETIMEDOUT|ECONNREFUSED|IP address/i.test(error?.message || "")
+=======
+    /querySrv|ENOTFOUND|ETIMEDOUT|ECONNREFUSED|IP address/i.test(
+      error?.message || "",
+    )
+>>>>>>> Stashed changes
   ) {
     const summary = getMongoConnectionSummary(env.MONGO_URI);
 
@@ -45,8 +51,11 @@ export const logMongoStartupError = (error) => {
 
   if (error?.codeName === "AtlasError" && /bad auth/i.test(error.message)) {
     const summary = getMongoConnectionSummary(env.MONGO_URI);
+<<<<<<< Updated upstream
     const hasAtlasAuthShape =
       summary?.database !== "(none)" && summary?.authSource === "admin";
+=======
+>>>>>>> Stashed changes
 
     console.error("MongoDB authentication failed.");
     if (summary) {
@@ -55,9 +64,13 @@ export const logMongoStartupError = (error) => {
       );
     }
     console.error(
+<<<<<<< Updated upstream
       hasAtlasAuthShape
         ? "Atlas is reachable, but it rejected the database user's credentials. Reset the Atlas Database Access password, update MONGO_URI, and URL-encode any special characters in the password."
         : "Check the Atlas database user's username/password, make sure special characters in the password are URL-encoded, and add a database path with authSource=admin to MONGO_URI if the user was created in Atlas.",
+=======
+      "Check the Atlas database user's username/password, make sure special characters in the password are URL-encoded, and add authSource=admin to MONGO_URI if the user was created in Atlas.",
+>>>>>>> Stashed changes
     );
     return;
   }
@@ -88,6 +101,10 @@ export const connectDatabase = async () => {
 
   await mongoose.connect(env.MONGO_URI, {
     autoIndex: !env.IS_PRODUCTION,
+<<<<<<< Updated upstream
+=======
+    family: 4,
+>>>>>>> Stashed changes
     maxPoolSize: env.MONGO_MAX_POOL_SIZE,
     serverSelectionTimeoutMS: env.MONGO_SERVER_SELECTION_TIMEOUT_MS,
     socketTimeoutMS: env.MONGO_SOCKET_TIMEOUT_MS,

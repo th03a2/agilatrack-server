@@ -103,4 +103,7 @@ modelSchema.index({ reference: 1 });
 const Entity = mongoose.model("Products", modelSchema);
 
 export default Entity;
+<<<<<<< Updated upstream
 
+=======
+>>>>>>> Stashed changes

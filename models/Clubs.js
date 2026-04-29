@@ -216,14 +216,20 @@ const modelSchema = new Schema(
       default: "Mixed",
     },
     foundedDate: { type: String, trim: true },
+<<<<<<< Updated upstream
 
+=======
+>>>>>>> Stashed changes
     ct: { type: String },
     icId: {
       front: { type: String },
       back: { type: String },
     },
     icgId: { type: String },
+<<<<<<< Updated upstream
 
+=======
+>>>>>>> Stashed changes
     social: {
       fb: { type: String },
       ig: { type: String },

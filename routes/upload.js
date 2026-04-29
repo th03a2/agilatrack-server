@@ -13,7 +13,11 @@ const registerUploadRoute = (path, assetType) => {
     path,
     requireAuth,
     ensureCloudinaryConfigured,
+<<<<<<< Updated upstream
     createUploadMiddleware(assetType).single("image"),
+=======
+    createUploadMiddleware(assetType),
+>>>>>>> Stashed changes
     createUploadSuccessHandler(assetType),
   );
 };

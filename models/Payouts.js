@@ -97,4 +97,7 @@ modelSchema.index({ payoutReference: 1 });
 const Entity = mongoose.model("Payouts", modelSchema);
 
 export default Entity;
+<<<<<<< Updated upstream
 
+=======
+>>>>>>> Stashed changes
