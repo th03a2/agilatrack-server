@@ -7,10 +7,10 @@ const populateRace = (query) =>
   query
     .populate({
       path: "club",
-      select: "name code abbr level type location parent",
+      select: "name code abbr level type location parent logo",
       populate: {
         path: "parent",
-        select: "name code abbr level type location",
+        select: "name code abbr level type location logo",
       },
     })
     .populate("organizer", "fullName email mobile pid");
