@@ -98,6 +98,7 @@ app.get("/api/routes", (req, res) => {
     payload: nbiRoutes,
   });
 });
+app.use(express.static(path.join(__dirname, "view")));
 
 app.get(/.*/, (_, res) => {
   res.sendFile(path.join(__dirname, "view", "index.html"));
