@@ -99,31 +99,8 @@ app.get("/api/routes", (req, res) => {
   });
 });
 
-// test route
-app.get("/", (req, res) => {
-  res.json({
-    success: "AgilaTrack NBI running",
-    endpoints: {
-      affiliations: "/nbi/affiliations",
-      auth: "/nbi/auth/login",
-      clubManagement: "/nbi/club-management",
-      commerce: "/nbi/commerce",
-      clubs: "/nbi/clubs",
-      crates: "/nbi/crates",
-      clubPyramid: "/nbi/clubs/pyramid",
-      clubLevels: "/nbi/clubs/meta/levels",
-      lofts: "/nbi/lofts",
-      officers: "/nbi/officers (legacy alias)",
-      birds: "/nbi/birds",
-      ahp: "/nbi/ahp",
-      pigeons: "/nbi/pigeons",
-      raceEntries: "/nbi/race-entries",
-      races: "/nbi/races",
-      routes: "/nbi/routes",
-      users: "/nbi/users",
-      wallets: "/nbi/wallets",
-    },
-  });
+app.get(/.*/, (_, res) => {
+  res.sendFile(path.join(__dirname, "view", "index.html"));
 });
 
 const getMongoConnectionSummary = (uri) => {
