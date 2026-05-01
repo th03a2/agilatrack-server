@@ -46,6 +46,28 @@ const approvalSchema = new Schema(
   { _id: false },
 );
 
+const applicationSchema = new Schema(
+  {
+    loftName: {
+      type: String,
+      trim: true,
+    },
+    birdOwnerType: {
+      type: String,
+      trim: true,
+    },
+    reasonForJoining: {
+      type: String,
+      trim: true,
+    },
+    validIdImage: {
+      type: String,
+      trim: true,
+    },
+  },
+  { _id: false },
+);
+
 const modelSchema = new Schema(
   {
     user: {
@@ -68,6 +90,12 @@ const modelSchema = new Schema(
         /^[A-Z0-9][A-Z0-9.-]*$/,
         "Member code must use uppercase letters, numbers, dashes, and dots only.",
       ],
+    },
+    membershipType: {
+      type: String,
+      trim: true,
+      lowercase: true,
+      default: "racer",
     },
     roles: [
       {
@@ -107,6 +135,10 @@ const modelSchema = new Schema(
         trim: true,
         uppercase: true,
       },
+    },
+    application: {
+      type: applicationSchema,
+      default: () => ({}),
     },
     approval: {
       type: approvalSchema,

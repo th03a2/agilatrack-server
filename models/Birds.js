@@ -23,8 +23,132 @@ export const BIRD_STATUSES = [
   "sold",
   "archived",
 ];
-export const BIRD_PHOTO_TYPES = ["profile", "wing", "eye", "pedigree-doc"];
+export const BIRD_IMAGE_FIELDS = [
+  {
+    key: "mainPhoto",
+    label: "Main Bird Photo",
+    required: true,
+    type: "profile",
+  },
+  {
+    key: "eyePhoto",
+    label: "Eye Photo",
+    required: true,
+    type: "eye",
+  },
+  {
+    key: "wingPhoto",
+    label: "Wing Photo",
+    required: true,
+    type: "wing",
+  },
+  {
+    key: "bandPhoto",
+    label: "Band / Ring Number Photo",
+    required: false,
+    type: "band",
+  },
+  {
+    key: "frontPhoto",
+    label: "Front View Photo",
+    required: false,
+    type: "front",
+  },
+  {
+    key: "sidePhoto",
+    label: "Side View Photo",
+    required: false,
+    type: "side",
+  },
+];
+export const BIRD_PHOTO_TYPES = [
+  ...new Set([...BIRD_IMAGE_FIELDS.map((field) => field.type), "pedigree-doc"]),
+];
 export const BIRD_APPROVAL_STATUSES = ["pending", "approved", "rejected"];
+
+const BIRD_IMAGE_KEY_BY_TYPE = Object.fromEntries(
+  BIRD_IMAGE_FIELDS.map((field) => [field.type, field.key]),
+);
+
+export function createEmptyBirdImageMap() {
+  return BIRD_IMAGE_FIELDS.reduce(
+    (imageMap, field) => ({
+      ...imageMap,
+      [field.key]: "",
+    }),
+    {},
+  );
+}
+
+export function buildBirdImageMap(source = {}) {
+  const images = {
+    ...createEmptyBirdImageMap(),
+  };
+
+  if (source?.images && typeof source.images === "object") {
+    BIRD_IMAGE_FIELDS.forEach(({ key }) => {
+      const value = source.images[key];
+
+      if (typeof value === "string" && value.trim()) {
+        images[key] = value.trim();
+      }
+    });
+  }
+
+  if (Array.isArray(source?.photos)) {
+    source.photos.forEach((photo) => {
+      if (!photo || typeof photo !== "object") {
+        return;
+      }
+
+      const type = String(photo.type || "").trim();
+      const key = BIRD_IMAGE_KEY_BY_TYPE[type];
+      const imageUrl = String(photo.source || "").trim();
+
+      if (key && imageUrl) {
+        images[key] = imageUrl;
+      }
+    });
+  }
+
+  if (!images.mainPhoto && typeof source?.birdImage === "string" && source.birdImage.trim()) {
+    images.mainPhoto = source.birdImage.trim();
+  }
+
+  return images;
+}
+
+export function buildBirdPhotosFromImageMap(imageMap = {}) {
+  const normalizedImageMap = {
+    ...createEmptyBirdImageMap(),
+    ...(imageMap || {}),
+  };
+
+  return BIRD_IMAGE_FIELDS.flatMap(({ key, label, type }) => {
+    const source = String(normalizedImageMap[key] || "").trim();
+
+    return source
+      ? [
+          {
+            label,
+            source,
+            type,
+          },
+        ]
+      : [];
+  });
+}
+
+export function getMissingRequiredBirdImages(imageMap = {}) {
+  const normalizedImageMap = {
+    ...createEmptyBirdImageMap(),
+    ...(imageMap || {}),
+  };
+
+  return BIRD_IMAGE_FIELDS.filter(
+    ({ key, required }) => required && !String(normalizedImageMap[key] || "").trim(),
+  ).map(({ label }) => label);
+}
 
 const parentSchema = new Schema(
   {
@@ -270,6 +394,22 @@ const modelSchema = new Schema(
 
 modelSchema.virtual("isRaceEligible").get(function getIsRaceEligible() {
   return ["active", "training"].includes(this.status) && !this.deletedAt;
+});
+
+modelSchema.virtual("images").get(function getBirdImages() {
+  return buildBirdImageMap({
+    birdImage: this.birdImage,
+    photos: this.photos,
+  });
+});
+
+modelSchema.virtual("birdImage").get(function getLegacyBirdImage() {
+  const images = buildBirdImageMap({
+    birdImage: this.get?.("birdImage"),
+    photos: this.photos,
+  });
+
+  return images.mainPhoto || "";
 });
 
 modelSchema.pre("validate", function normalizeBird(next) {

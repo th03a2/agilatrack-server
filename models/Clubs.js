@@ -17,6 +17,8 @@ export const CLUB_PARENT_LEVEL = {
   national: null,
 };
 
+export const CLUB_DIRECTORY_TYPES = ["Racing", "Breeding", "Show", "Mixed"];
+
 export const getClubTypeFromLevel = (level) =>
   level === "municipality" ? "club" : "operator";
 
@@ -191,6 +193,37 @@ const modelSchema = new Schema(
       default: "draft",
     },
 
+    clubType: {
+      type: String,
+      enum: CLUB_DIRECTORY_TYPES,
+      default: "Racing",
+      trim: true,
+    },
+    contactPerson: {
+      type: String,
+      trim: true,
+    },
+    contactNumber: {
+      type: String,
+      trim: true,
+    },
+    email: {
+      type: String,
+      trim: true,
+      lowercase: true,
+    },
+    description: {
+      type: String,
+      trim: true,
+    },
+    foundedDate: {
+      type: String,
+      trim: true,
+    },
+    membershipFee: {
+      type: String,
+      trim: true,
+    },
     tagline: { type: String },
     history: { type: String },
     message: { type: String },
