@@ -56,6 +56,23 @@ const userSchema = new Schema(
     email: {
       type: String,
       unique: true,
+      trim: true,
+      lowercase: true,
+    },
+    username: {
+      type: String,
+      unique: true,
+      sparse: true,
+      trim: true,
+      lowercase: true,
+      minlength: 4,
+    },
+    isEmailVerified: {
+      type: Boolean,
+      default: false,
+    },
+    emailVerifiedAt: {
+      type: Date,
     },
     password: {
       type: String,
@@ -136,6 +153,13 @@ const userSchema = new Schema(
       lowercase: true,
       default: "regular",
     },
+    state: [
+      {
+        type: String,
+        trim: true,
+        lowercase: true,
+      },
+    ],
     isMale: {
       type: Boolean,
       default: false,
@@ -226,7 +250,7 @@ userSchema.pre("save", async function (next) {
 });
 
 userSchema.statics.findByEmail = async function (email) {
-  return this.findOne({ email });
+  return this.findOne({ email: String(email || "").trim().toLowerCase() });
 };
 
 const Entity = mongoose.model("Users", userSchema);

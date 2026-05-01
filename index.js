@@ -16,7 +16,10 @@ import birdsRouter from "./routes/birds.js";
 import avianHealthProfilesRouter from "./routes/avianHealthProfiles.js";
 import raceEntriesRouter from "./routes/raceEntries.js";
 import racesRouter from "./routes/races.js";
+import liveOpsRouter from "./routes/liveOps.js";
+import { getHealth } from "./controllers/liveOps.js";
 import { nbiRoutes, logNbiRoutes } from "./routes/index.js";
+import uploadsRouter from "./routes/uploads.js";
 import usersRouter from "./routes/users.js";
 import walletsRouter from "./routes/wallets.js";
 
@@ -61,10 +64,12 @@ app.use("/nbi/ahp", avianHealthProfilesRouter);
 app.use("/nbi/avian-health-profiles", avianHealthProfilesRouter);
 app.use("/nbi/pigeons", birdsRouter);
 app.use("/nbi/pegions", birdsRouter);
+app.use("/nbi/upload", uploadsRouter);
 app.use("/nbi/race-entries", raceEntriesRouter);
 app.use("/nbi/races", racesRouter);
 app.use("/nbi/users", usersRouter);
 app.use("/nbi/wallets", walletsRouter);
+app.use("/nbi", liveOpsRouter);
 
 // Legacy aliases kept during route transition.
 app.use("/api/auth", authRouter);
@@ -80,10 +85,14 @@ app.use("/api/ahp", avianHealthProfilesRouter);
 app.use("/api/avian-health-profiles", avianHealthProfilesRouter);
 app.use("/api/pigeons", birdsRouter);
 app.use("/api/pegions", birdsRouter);
+app.use("/api/upload", uploadsRouter);
 app.use("/api/race-entries", raceEntriesRouter);
 app.use("/api/races", racesRouter);
 app.use("/api/users", usersRouter);
 app.use("/api/wallets", walletsRouter);
+app.use("/api", liveOpsRouter);
+
+app.get("/health", getHealth);
 
 app.get("/nbi/routes", (req, res) => {
   res.json({

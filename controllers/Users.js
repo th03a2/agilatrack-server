@@ -2,8 +2,41 @@ import Users from "../models/Users.js";
 
 const USER_SELECT = "-password -__v";
 
-const sendError = (res, error, status = 400) =>
-  res.status(status).json({ error: error.message || error });
+const getDuplicateFieldMessage = (error) => {
+  const field = Object.keys(error?.keyPattern || error?.keyValue || {})[0] || "";
+
+  if (field === "email") {
+    return "An account with this email already exists.";
+  }
+
+  if (field === "username") {
+    return "This username is already taken.";
+  }
+
+  return "This record already exists.";
+};
+
+const normalizeUserPayload = (payload = {}) => {
+  const nextPayload = { ...payload };
+
+  if (typeof nextPayload.email === "string") {
+    nextPayload.email = nextPayload.email.trim().toLowerCase();
+  }
+
+  if (typeof nextPayload.username === "string") {
+    nextPayload.username = nextPayload.username.trim().toLowerCase();
+  }
+
+  return nextPayload;
+};
+
+const sendError = (res, error, status = 400) => {
+  if (error?.code === 11000) {
+    return res.status(409).json({ error: getDuplicateFieldMessage(error) });
+  }
+
+  return res.status(status).json({ error: error.message || error });
+};
 
 const buildUserQuery = (query = {}) => {
   const {
@@ -29,6 +62,7 @@ const buildUserQuery = (query = {}) => {
   if (search) {
     dbQuery.$or = [
       { email: { $regex: search, $options: "i" } },
+      { username: { $regex: search, $options: "i" } },
       { "fullName.fname": { $regex: search, $options: "i" } },
       { "fullName.mname": { $regex: search, $options: "i" } },
       { "fullName.lname": { $regex: search, $options: "i" } },
@@ -68,7 +102,7 @@ export const findOne = async (req, res) => {
 
 export const createUser = async (req, res) => {
   try {
-    const user = await Users.create(req.body);
+    const user = await Users.create(normalizeUserPayload(req.body));
     const payload = await Users.findById(user._id)
       .select(USER_SELECT)
       .lean({ virtuals: true });
@@ -84,7 +118,7 @@ export const updateUser = async (req, res) => {
     const user = await Users.findById(req.params.id);
     if (!user) return res.status(404).json({ error: "User not found" });
 
-    user.set(req.body);
+    user.set(normalizeUserPayload(req.body));
     await user.save();
 
     const payload = await Users.findById(user._id)
