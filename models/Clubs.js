@@ -176,6 +176,12 @@ const modelSchema = new Schema(
       type: mongoose.Schema.Types.ObjectId,
       ref: "Users",
     },
+    members: [
+      {
+        type: mongoose.Schema.Types.ObjectId,
+        ref: "Users",
+      },
+    ],
 
     address: {
       street: { type: String },

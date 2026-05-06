@@ -10,17 +10,63 @@ import {
   recordArrival,
   updateEntry,
 } from "../controllers/RaceEntries.js";
+import { requireAnyPermission, requireSessionUser } from "../middleware/sessionAuth.js";
+import { validateObjectIdParam } from "../middleware/validateObjectId.js";
+import { validateRequest } from "../middlewares/validateRequest.js";
+import { raceEntrySchemas } from "../validations/schemas.js";
 
 const router = express.Router();
 
 router.get("/", findAll);
-router.get("/:id", findOne);
-router.post("/", bookEntry);
-router.put("/:id", updateEntry);
-router.put("/:id/check-in", checkInEntry);
-router.put("/:id/boarding", boardEntry);
-router.put("/:id/departure", departEntry);
-router.put("/:id/arrival", recordArrival);
-router.delete("/:id", deleteEntry);
+router.get("/:id", validateObjectIdParam("id"), findOne);
+router.post(
+  "/",
+  requireSessionUser,
+  requireAnyPermission("club:manage", "operations:manage", "records:self", "races:read"),
+  validateRequest(raceEntrySchemas.book),
+  bookEntry,
+);
+router.put(
+  "/:id",
+  requireSessionUser,
+  validateObjectIdParam("id"),
+  requireAnyPermission("club:manage", "operations:manage", "records:self"),
+  updateEntry,
+);
+router.put(
+  "/:id/check-in",
+  requireSessionUser,
+  validateObjectIdParam("id"),
+  requireAnyPermission("club:manage", "operations:manage", "races:manage"),
+  checkInEntry,
+);
+router.put(
+  "/:id/boarding",
+  requireSessionUser,
+  validateObjectIdParam("id"),
+  requireAnyPermission("club:manage", "operations:manage", "races:manage"),
+  boardEntry,
+);
+router.put(
+  "/:id/departure",
+  requireSessionUser,
+  validateObjectIdParam("id"),
+  requireAnyPermission("club:manage", "operations:manage", "races:manage"),
+  departEntry,
+);
+router.put(
+  "/:id/arrival",
+  requireSessionUser,
+  validateObjectIdParam("id"),
+  requireAnyPermission("club:manage", "operations:manage", "races:manage"),
+  recordArrival,
+);
+router.delete(
+  "/:id",
+  requireSessionUser,
+  validateObjectIdParam("id"),
+  requireAnyPermission("admin:manage", "club:manage", "operations:manage"),
+  deleteEntry,
+);
 
 export default router;

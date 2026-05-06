@@ -10,17 +10,50 @@ import {
   rejectAffiliation,
   updateAffiliation,
 } from "../controllers/Affiliations.js";
+import { requireAnyPermission, requireSessionUser } from "../middleware/sessionAuth.js";
+import { validateObjectIdParam } from "../middleware/validateObjectId.js";
+import { validateRequest } from "../middlewares/validateRequest.js";
+import { affiliationSchemas } from "../validations/schemas.js";
 
 const router = express.Router();
 
-router.get("/", findAll);
-router.get("/club-dashboard/:clubId", getClubDashboard);
-router.put("/:id/approve", approveAffiliation);
-router.put("/:id/reject", rejectAffiliation);
-router.put("/:id/assign-role", assignAffiliationRole);
-router.get("/:id", findOne);
-router.post("/", createAffiliation);
-router.put("/:id", updateAffiliation);
-router.delete("/:id", deleteAffiliation);
+router.get("/", requireSessionUser, findAll);
+router.get(
+  "/club-dashboard/:clubId",
+  requireSessionUser,
+  validateObjectIdParam("clubId", "club"),
+  getClubDashboard,
+);
+router.put(
+  "/:id/approve",
+  requireSessionUser,
+  validateObjectIdParam("id"),
+  requireAnyPermission("admin:manage", "club:manage", "join_requests:manage"),
+  approveAffiliation,
+);
+router.put(
+  "/:id/reject",
+  requireSessionUser,
+  validateObjectIdParam("id"),
+  requireAnyPermission("admin:manage", "club:manage", "join_requests:manage"),
+  rejectAffiliation,
+);
+router.put(
+  "/:id/assign-role",
+  requireSessionUser,
+  validateObjectIdParam("id"),
+  requireAnyPermission("admin:manage", "club:manage", "join_requests:manage"),
+  assignAffiliationRole,
+);
+router.get("/:id", requireSessionUser, validateObjectIdParam("id"), findOne);
+router.post("/", requireSessionUser, validateRequest(affiliationSchemas.create), createAffiliation);
+router.put("/:id", requireSessionUser, validateObjectIdParam("id"), updateAffiliation);
+router.delete(
+  "/:id",
+  requireSessionUser,
+  validateObjectIdParam("id"),
+  requireAnyPermission("admin:manage", "club:manage", "join_requests:manage"),
+  deleteAffiliation,
+);
 
 export default router;

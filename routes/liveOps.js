@@ -9,16 +9,52 @@ import {
   findSupport,
   getHealth,
 } from "../controllers/liveOps.js";
+import { requireAnyPermission, requireSessionUser } from "../middleware/sessionAuth.js";
 
 const router = express.Router();
 
 router.get("/health", getHealth);
-router.get("/payments", findPayments);
-router.get("/payouts", findPayouts);
-router.get("/products", findProducts);
-router.get("/orders", findOrders);
-router.get("/sellers", findSellers);
-router.get("/shipments", findShipments);
-router.get("/support", findSupport);
+router.get(
+  "/payments",
+  requireSessionUser,
+  requireAnyPermission("dashboard:live_ops", "finance:manage"),
+  findPayments,
+);
+router.get(
+  "/payouts",
+  requireSessionUser,
+  requireAnyPermission("dashboard:live_ops", "finance:manage"),
+  findPayouts,
+);
+router.get(
+  "/products",
+  requireSessionUser,
+  requireAnyPermission("dashboard:live_ops", "ecommerce:manage"),
+  findProducts,
+);
+router.get(
+  "/orders",
+  requireSessionUser,
+  requireAnyPermission("dashboard:live_ops", "ecommerce:manage"),
+  findOrders,
+);
+router.get(
+  "/sellers",
+  requireSessionUser,
+  requireAnyPermission("dashboard:live_ops", "ecommerce:manage"),
+  findSellers,
+);
+router.get(
+  "/shipments",
+  requireSessionUser,
+  requireAnyPermission("dashboard:live_ops", "ecommerce:manage"),
+  findShipments,
+);
+router.get(
+  "/support",
+  requireSessionUser,
+  requireAnyPermission("admin:manage", "dashboard:live_ops", "ecommerce:manage"),
+  findSupport,
+);
 
 export default router;

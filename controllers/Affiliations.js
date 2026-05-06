@@ -1,20 +1,36 @@
+import mongoose from "mongoose";
 import Affiliations from "../models/Affiliations.js";
 import Birds from "../models/Birds.js";
 import Clubs from "../models/Clubs.js";
 import Users from "../models/Users.js";
+import {
+  canAccessClubWorkspace,
+  canManageClubWorkspace,
+  hasPrivilegedDirectoryAccess,
+} from "../middleware/sessionAuth.js";
+import { clearCacheByPrefix } from "../utils/cache.js";
 
 const sendError = (res, error, status = 400) =>
   res.status(status).json({ error: error.message || error });
 
 const CLUB_ROLE_LABELS = {
+  owner: "Owner",
   "assistant-admin": "Assistant Admin",
   "club-officer": "Club Officer",
   "club-staff": "Club Staff",
+  operator: "Operator",
   "race-participant": "Race Participant",
   "regular-member": "Regular Member",
+  secretary: "Secretary",
 };
 
 const CLUB_ROLE_INPUTS = {
+  owner: "owner",
+  "club owner": "owner",
+  secretary: "secretary",
+  "club secretary": "secretary",
+  operator: "operator",
+  "race operator": "operator",
   "assistant admin": "assistant-admin",
   "assistant-admin": "assistant-admin",
   organizer: "assistant-admin",
@@ -108,8 +124,19 @@ const normalizeClubRole = (value = "") =>
   CLUB_ROLE_INPUTS[normalizeFlag(value)] || "race-participant";
 const getClubRoleLabel = (value = "") =>
   CLUB_ROLE_LABELS[normalizeClubRole(value)] || "Race Participant";
+const getUserRoleFromClubRole = (value = "") => {
+  const normalizedRole = normalizeClubRole(value);
+
+  if (normalizedRole === "owner") return "owner";
+  if (normalizedRole === "secretary") return "secretary";
+  if (normalizedRole === "operator") return "operator";
+
+  return "member";
+};
 const getAffiliationRoleLabel = (affiliation = {}) =>
   getClubRoleLabel(affiliation?.roles?.[0] || affiliation?.membershipType || "racer");
+const isOwnerAffiliation = (affiliation = {}) =>
+  normalizeClubRole(affiliation?.roles?.[0] || affiliation?.membershipType || "") === "owner";
 const getPendingRequestStatusLabel = (status = "") => {
   const normalized = normalizeFlag(status);
 
@@ -258,8 +285,9 @@ const buildDashboardPayload = async (clubId) => {
         clubRequested: normalizeText(club.name || club.abbr || club.code),
         dateApplied: formatDateLabel(record?.approval?.requestedAt || record?.createdAt),
         status: getPendingRequestStatusLabel(record?.status),
-        address: formatClubLocation({ location: record?.user?.address || {} }),
-        validIdImage: normalizeText(record?.application?.validIdImage),
+        address:
+          normalizeText(record?.application?.address) ||
+          formatClubLocation({ location: record?.user?.address || {} }),
         existingBirdRecords: userBirds.map((bird) =>
           [normalizeText(bird?.name), normalizeText(bird?.bandNumber)]
             .filter(Boolean)
@@ -270,10 +298,16 @@ const buildDashboardPayload = async (clubId) => {
         verificationStatus: `Profile ${formatWords(profileStatus)}`,
         preferredRole: getAffiliationRoleLabel(record),
         application: {
-          loftName: normalizeText(record?.application?.loftName),
-          birdOwnerType: normalizeText(record?.application?.birdOwnerType),
+          address: normalizeText(record?.application?.address),
+          email: normalizeText(record?.application?.email),
+          fullName: normalizeText(record?.application?.fullName),
+          photos: Array.isArray(record?.application?.photos)
+            ? record.application.photos.map((photo) => normalizeText(photo)).filter(Boolean)
+            : [],
+          recommenderName: normalizeText(record?.application?.recommenderName),
           reasonForJoining: normalizeText(record?.application?.reasonForJoining),
-          validIdImage: normalizeText(record?.application?.validIdImage),
+          signatureDate: normalizeText(record?.application?.signatureDate),
+          signatureName: normalizeText(record?.application?.signatureName),
         },
         profileStatus,
       };
@@ -375,11 +409,42 @@ const buildAffiliationQuery = (query = {}) => {
   return dbQuery;
 };
 
+const ensureObjectId = (value, label) => {
+  if (!mongoose.Types.ObjectId.isValid(value)) {
+    throw Object.assign(new Error(`Invalid ${label} id.`), { status: 400 });
+  }
+};
+
+const canViewAffiliation = (auth = {}, affiliation = {}) => {
+  const affiliationUser =
+    affiliation?.user && typeof affiliation.user === "object"
+      ? affiliation.user?._id
+      : affiliation?.user;
+  const affiliationClub =
+    affiliation?.club && typeof affiliation.club === "object"
+      ? affiliation.club?._id
+      : affiliation?.club;
+
+  return (
+    String(auth?.userId || "") === String(affiliationUser || "") ||
+    hasPrivilegedDirectoryAccess(auth) ||
+    canAccessClubWorkspace(auth, String(affiliationClub || ""))
+  );
+};
+
 export const findAll = async (req, res) => {
   try {
-    const payload = await populateAffiliation(
-      Affiliations.find(buildAffiliationQuery(req.query)),
-    )
+    const dbQuery = buildAffiliationQuery(req.query);
+    const requestedClubId = normalizeText(req.query?.club);
+
+    if (requestedClubId && !canAccessClubWorkspace(req.auth, requestedClubId)) {
+      dbQuery.user = req.auth.userId;
+      delete dbQuery.club;
+    } else if (!hasPrivilegedDirectoryAccess(req.auth) && !requestedClubId) {
+      dbQuery.user = req.auth.userId;
+    }
+
+    const payload = await populateAffiliation(Affiliations.find(dbQuery))
       .sort({ createdAt: -1 })
       .lean({ virtuals: true });
 
@@ -391,6 +456,12 @@ export const findAll = async (req, res) => {
 
 export const getClubDashboard = async (req, res) => {
   try {
+    if (!canAccessClubWorkspace(req.auth, req.params.clubId)) {
+      return res.status(403).json({
+        error: "You do not have access to this club workspace.",
+      });
+    }
+
     const payload = await buildDashboardPayload(req.params.clubId);
 
     if (!payload) {
@@ -416,6 +487,12 @@ export const findOne = async (req, res) => {
       return res.status(404).json({ error: "Affiliation not found" });
     }
 
+    if (!canViewAffiliation(req.auth, payload)) {
+      return res.status(403).json({
+        error: "You do not have access to this affiliation record.",
+      });
+    }
+
     res.json({ success: "Affiliation fetched successfully", payload });
   } catch (error) {
     sendError(res, error);
@@ -424,25 +501,87 @@ export const findOne = async (req, res) => {
 
 export const createAffiliation = async (req, res) => {
   try {
-    const applicant = await Users.findById(req.body?.user)
-      .select("pid files.profile")
-      .lean();
+    ensureObjectId(req.body?.club, "club");
+    ensureObjectId(req.body?.user, "user");
 
-    const hasProfilePhoto = Boolean(
-      applicant?.pid || applicant?.files?.profile,
-    );
-
-    if (!hasProfilePhoto) {
-      return res.status(400).json({
-        error:
-          "Profile photo is required before submitting a club application.",
+    const isSelfRequest = String(req.auth?.userId || "") === String(req.body?.user || "");
+    if (!isSelfRequest && !hasPrivilegedDirectoryAccess(req.auth)) {
+      return res.status(403).json({
+        error: "You can only create affiliation requests for your own account.",
       });
     }
 
-    const created = await Affiliations.create(req.body);
+    const address = normalizeText(req.body?.application?.address);
+    const email = normalizeText(req.body?.application?.email);
+    const fullName = normalizeText(req.body?.application?.fullName);
+    const photos = Array.isArray(req.body?.application?.photos)
+      ? req.body.application.photos.map((photo) => normalizeText(photo)).filter(Boolean)
+      : [];
+    const recommenderName = normalizeText(req.body?.application?.recommenderName);
+    const reasonForJoining = normalizeText(req.body?.application?.reasonForJoining);
+    const signatureDate = normalizeText(req.body?.application?.signatureDate);
+    const signatureName = normalizeText(req.body?.application?.signatureName);
+
+    if (!fullName) {
+      return res.status(400).json({ error: "Full name is required." });
+    }
+
+    if (!email) {
+      return res.status(400).json({ error: "Email address is required." });
+    }
+
+    if (!address) {
+      return res.status(400).json({ error: "Address is required." });
+    }
+
+    if (!reasonForJoining) {
+      return res.status(400).json({ error: "Reason for joining is required." });
+    }
+
+    const existingRequest = await Affiliations.findOne({
+      club: req.body.club,
+      deletedAt: { $exists: false },
+      status: { $in: ["pending", "approved"] },
+      user: req.body.user,
+    })
+      .select("_id status")
+      .lean();
+
+    if (existingRequest?._id) {
+      return res.status(409).json({
+        error:
+          existingRequest.status === "approved"
+            ? "This user is already an approved member of the selected club."
+            : "A membership request for this club is already pending.",
+      });
+    }
+
+    const created = await Affiliations.create({
+      application: {
+        address,
+        email,
+        fullName,
+        photos,
+        recommenderName,
+        reasonForJoining,
+        signatureDate,
+        signatureName,
+      },
+      approval: {
+        requestedAt: new Date(),
+      },
+      club: req.body.club,
+      membershipType: normalizeClubRole(req.body?.membershipType || "racer"),
+      mobile: normalizeText(req.body?.mobile),
+      remarks: [],
+      roles: [normalizeClubRole(req.body?.membershipType || "racer")],
+      status: "pending",
+      user: req.body.user,
+    });
     const payload = await populateAffiliation(
       Affiliations.findById(created._id),
     ).lean({ virtuals: true });
+    clearCacheByPrefix("dashboard:stats");
 
     res.status(201).json({
       success: "Affiliation created successfully",
@@ -464,6 +603,18 @@ export const approveAffiliation = async (req, res) => {
       return res.status(404).json({ error: "Affiliation not found" });
     }
 
+    if (!canManageClubWorkspace(req.auth, String(affiliation.club || ""))) {
+      return res.status(403).json({
+        error: "You do not have permission to approve this club request.",
+      });
+    }
+
+    if (!["pending", "rejected"].includes(normalizeFlag(affiliation.status))) {
+      return res.status(400).json({
+        error: "Only pending or rejected club applications can be approved.",
+      });
+    }
+
     affiliation.status = "approved";
     affiliation.approval = {
       ...(affiliation.approval?.toObject?.() || affiliation.approval || {}),
@@ -479,8 +630,33 @@ export const approveAffiliation = async (req, res) => {
     }
 
     await affiliation.save();
+    await Promise.all([
+      Clubs.updateOne(
+        { _id: affiliation.club },
+        { $addToSet: { members: affiliation.user } },
+      ),
+      Users.updateOne(
+        { _id: affiliation.user },
+        {
+          $set: {
+            activePlatform: {
+              _id: affiliation._id,
+              access: [],
+              club: affiliation.club,
+              portal: "club",
+              role: affiliation.roles,
+            },
+            clubId: affiliation.club,
+            membership: "member",
+            membershipStatus: "active",
+            role: getUserRoleFromClubRole(affiliation.roles?.[0] || affiliation.membershipType),
+          },
+        },
+      ),
+    ]);
 
     const payload = await buildDashboardPayload(affiliation.club);
+    clearCacheByPrefix("dashboard:stats");
 
     return res.json({
       success: "Affiliation approved successfully",
@@ -502,6 +678,18 @@ export const rejectAffiliation = async (req, res) => {
       return res.status(404).json({ error: "Affiliation not found" });
     }
 
+    if (!canManageClubWorkspace(req.auth, String(affiliation.club || ""))) {
+      return res.status(403).json({
+        error: "You do not have permission to reject this club request.",
+      });
+    }
+
+    if (normalizeFlag(affiliation.status) !== "pending") {
+      return res.status(400).json({
+        error: "Only pending club applications can be rejected.",
+      });
+    }
+
     const reason = normalizeText(req.body?.reason);
 
     affiliation.status = "rejected";
@@ -515,6 +703,7 @@ export const rejectAffiliation = async (req, res) => {
     await affiliation.save();
 
     const payload = await buildDashboardPayload(affiliation.club);
+    clearCacheByPrefix("dashboard:stats");
 
     return res.json({
       success: "Affiliation rejected successfully",
@@ -542,10 +731,25 @@ export const assignAffiliationRole = async (req, res) => {
       return res.status(404).json({ error: "Affiliation not found" });
     }
 
+    if (!canManageClubWorkspace(req.auth, String(affiliation.club || ""))) {
+      return res.status(403).json({
+        error: "You do not have permission to update this club role.",
+      });
+    }
+
     affiliation.roles = [normalizeClubRole(roleInput)];
     await affiliation.save();
+    await Users.updateOne(
+      { _id: affiliation.user },
+      {
+        $set: {
+          role: getUserRoleFromClubRole(roleInput),
+        },
+      },
+    );
 
     const payload = await buildDashboardPayload(affiliation.club);
+    clearCacheByPrefix("dashboard:stats");
 
     return res.json({
       success: "Affiliation role updated successfully",
@@ -564,10 +768,44 @@ export const updateAffiliation = async (req, res) => {
       return res.status(404).json({ error: "Affiliation not found" });
     }
 
+    const isOwner = String(req.auth?.userId || "") === String(affiliation.user || "");
+    const canManage = canManageClubWorkspace(req.auth, String(affiliation.club || ""));
+
+    if (!isOwner && !canManage) {
+      return res.status(403).json({
+        error: "You do not have permission to update this affiliation.",
+      });
+    }
+
+    if (
+      canManage &&
+      isOwnerAffiliation(affiliation) &&
+      normalizeFlag(req.body?.status) === "deactivated"
+    ) {
+      return res.status(400).json({
+        error: "The club owner account must stay active and cannot be suspended or archived.",
+      });
+    }
+
     const rejectionReason = String(req.body?.approval?.reason || "").trim();
     const isRejectedUpdate = String(req.body?.status || "").trim() === "rejected";
 
-    affiliation.set(req.body);
+    if (canManage) {
+      affiliation.set(req.body);
+    } else {
+      affiliation.set({
+        application:
+          req.body?.application && typeof req.body.application === "object"
+            ? {
+                ...((affiliation.application?.toObject?.() || affiliation.application || {})),
+                ...req.body.application,
+              }
+            : affiliation.application,
+        lofts: Array.isArray(req.body?.lofts) ? req.body.lofts : affiliation.lofts,
+        mobile: normalizeText(req.body?.mobile || affiliation.mobile),
+        primaryLoft: req.body?.primaryLoft || affiliation.primaryLoft,
+      });
+    }
 
     if (isRejectedUpdate && rejectionReason) {
       const existingRemarks = Array.isArray(affiliation.remarks)
@@ -581,6 +819,7 @@ export const updateAffiliation = async (req, res) => {
     }
 
     await affiliation.save();
+    clearCacheByPrefix("dashboard:stats");
 
     const payload = await populateAffiliation(
       Affiliations.findById(affiliation._id),
@@ -594,6 +833,24 @@ export const updateAffiliation = async (req, res) => {
 
 export const deleteAffiliation = async (req, res) => {
   try {
+    const affiliation = await Affiliations.findById(req.params.id).lean();
+
+    if (!affiliation?._id) {
+      return res.status(404).json({ error: "Affiliation not found" });
+    }
+
+    if (!canManageClubWorkspace(req.auth, String(affiliation.club || ""))) {
+      return res.status(403).json({
+        error: "You do not have permission to archive this affiliation.",
+      });
+    }
+
+    if (isOwnerAffiliation(affiliation)) {
+      return res.status(400).json({
+        error: "The club owner account must stay active and cannot be archived.",
+      });
+    }
+
     const payload = await populateAffiliation(
       Affiliations.findByIdAndUpdate(
         req.params.id,
@@ -608,6 +865,7 @@ export const deleteAffiliation = async (req, res) => {
     if (!payload) {
       return res.status(404).json({ error: "Affiliation not found" });
     }
+    clearCacheByPrefix("dashboard:stats");
 
     res.json({ success: "Affiliation archived successfully", payload });
   } catch (error) {

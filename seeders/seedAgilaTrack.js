@@ -3,7 +3,7 @@ import mongoose from "mongoose";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import Affiliations from "../models/Affiliations.js";
-import Birds from "../models/Birds.js";
+import Birds, { buildBirdPhotosFromImageMap } from "../models/Birds.js";
 import ClubManagement from "../models/ClubManagement.js";
 import Clubs from "../models/Clubs.js";
 import Lofts from "../models/Lofts.js";
@@ -87,15 +87,72 @@ const places = {
     barangayCode: "1006",
     zip: "3107",
   },
+  aliaga: {
+    region: "Central Luzon",
+    regionCode: "R3",
+    province: "Nueva Ecija",
+    provinceCode: "NUE",
+    municipality: "Aliaga",
+    municipalityCode: "ALI",
+    barangay: "Poblacion Centro",
+    barangayCode: "1007",
+    zip: "3111",
+  },
 };
 
 const addressFromPlace = (place, street) => ({
   street,
   barangay: place.barangay,
-  city: place.municipality,
+  barangayCode: place.barangayCode,
+  municipality: place.municipality,
+  municipalityCode: place.municipalityCode,
   province: place.province,
+  provinceCode: place.provinceCode,
   region: place.region,
+  regionCode: place.regionCode,
   zip: place.zip,
+});
+
+const createSeedImageDataUrl = ({ accent = "#0f766e", subtitle = "", title = "" } = {}) => {
+  const svg = `
+    <svg xmlns="http://www.w3.org/2000/svg" width="900" height="600" viewBox="0 0 900 600">
+      <defs>
+        <linearGradient id="bg" x1="0%" y1="0%" x2="100%" y2="100%">
+          <stop offset="0%" stop-color="${accent}" />
+          <stop offset="100%" stop-color="#0f172a" />
+        </linearGradient>
+      </defs>
+      <rect width="900" height="600" fill="url(#bg)" rx="32" />
+      <circle cx="720" cy="160" r="96" fill="rgba(255,255,255,0.12)" />
+      <circle cx="190" cy="420" r="128" fill="rgba(255,255,255,0.08)" />
+      <text x="72" y="250" fill="#f8fafc" font-family="Arial, sans-serif" font-size="52" font-weight="700">
+        ${String(title || "").replace(/[<&>]/g, "")}
+      </text>
+      <text x="72" y="320" fill="#e2e8f0" font-family="Arial, sans-serif" font-size="26">
+        ${String(subtitle || "").replace(/[<&>]/g, "")}
+      </text>
+    </svg>
+  `.trim();
+
+  return `data:image/svg+xml;charset=UTF-8,${encodeURIComponent(svg)}`;
+};
+
+const buildSeedBirdImageMap = (bird = {}) => ({
+  mainPhoto: createSeedImageDataUrl({
+    accent: "#1d4ed8",
+    subtitle: String(bird.bandNumber || "Seeded bird"),
+    title: `${String(bird.name || "Pigeon")} Main Photo`,
+  }),
+  eyePhoto: createSeedImageDataUrl({
+    accent: "#0f766e",
+    subtitle: String(bird.bandNumber || "Seeded bird"),
+    title: `${String(bird.name || "Pigeon")} Eye Photo`,
+  }),
+  wingPhoto: createSeedImageDataUrl({
+    accent: "#9333ea",
+    subtitle: String(bird.bandNumber || "Seeded bird"),
+    title: `${String(bird.name || "Pigeon")} Wing Photo`,
+  }),
 });
 
 const clubSeeds = [
@@ -256,14 +313,32 @@ const clubSeeds = [
     status: "approved",
     population: 1,
   },
+  {
+    key: "aliaga",
+    parentKey: "nuevaEcija",
+    name: "Aliaga Flyers Club",
+    code: "PH-NUE-ALI",
+    abbr: "AFC",
+    level: "municipality",
+    location: {
+      region: places.aliaga.region,
+      regionCode: places.aliaga.regionCode,
+      province: places.aliaga.province,
+      provinceCode: places.aliaga.provinceCode,
+      municipality: places.aliaga.municipality,
+      municipalityCode: places.aliaga.municipalityCode,
+      barangayCode: places.aliaga.barangayCode,
+    },
+    status: "approved",
+    population: 0,
+  },
 ];
 
 const userSeeds = [
   {
     key: "juan",
     clubKey: "cabanatuan",
-    loftKey: "lopezSky",
-    managementTitle: "Owner",
+    loftKey: "delaCruzNorth",
     email: "juan.delacruz@agilatrack.test",
     fullName: {
       fname: "Juan",
@@ -275,12 +350,12 @@ const userSeeds = [
     mobile: "09170000001",
     isMale: true,
     placeKey: "cabanatuan",
+    membershipType: "owner",
+    affiliationRoles: ["owner"],
+    role: "owner",
   },
   {
     key: "maria",
-    clubKey: "cabanatuan",
-    loftKey: "delaCruzNorth",
-    managementTitle: "Secretary",
     email: "maria.santos@agilatrack.test",
     fullName: {
       fname: "Maria",
@@ -292,11 +367,17 @@ const userSeeds = [
     mobile: "09170000002",
     isMale: false,
     placeKey: "cabanatuan",
+    membership: "guest",
+    state: ["guest"],
+    profileStatus: "pending",
+    skipAffiliation: true,
+    workTitle: "Guest Applicant",
   },
   {
     key: "pedro",
     clubKey: "cabanatuan",
     loftKey: "ramosRidge",
+    managementTitle: "Owner",
     email: "pedro.ramos@agilatrack.test",
     fullName: {
       fname: "Pedro",
@@ -375,6 +456,25 @@ const userSeeds = [
     mobile: "09170000007",
     isMale: true,
     placeKey: "talavera",
+  },
+  {
+    key: "oliver",
+    clubKey: "cabanatuan",
+    loftKey: "lopezSky",
+    email: "oliver.operator@agilatrack.test",
+    fullName: {
+      fname: "Oliver",
+      mname: "Navarro",
+      lname: "Santiago",
+      title: "Mr.",
+      nickname: "Olly",
+    },
+    mobile: "09170000008",
+    isMale: true,
+    placeKey: "cabanatuan",
+    membershipType: "operator",
+    affiliationRoles: ["operator"],
+    workTitle: "Race Operator",
   },
 ];
 
@@ -545,11 +645,11 @@ const raceSeeds = [
       location: "Cabanatuan Flyers Clubhouse Crate Area",
     },
     transport: {
-      handlerKey: "maria",
-      transporterKey: "juan",
+      handlerKey: "oliver",
+      transporterKey: "pedro",
       driver: {
-        name: "Juan Dela Cruz",
-        mobile: "09170000001",
+        name: "Pedro Ramos",
+        mobile: "09170000003",
       },
       vehicle: {
         type: "utility van",
@@ -569,9 +669,9 @@ const raceSeeds = [
       },
     },
     liberation: {
-      liberatorKey: "juan",
-      releasedByName: "Juan Dela Cruz",
-      witnesses: [{ userKey: "maria", role: "Secretary" }],
+      liberatorKey: "oliver",
+      releasedByName: "Oliver Santiago",
+      witnesses: [{ userKey: "pedro", role: "Owner" }],
     },
     weather: {
       condition: "Pending race-day check",
@@ -631,7 +731,7 @@ const raceEntrySeeds = [
   },
   {
     raceKey: "cabanatuanTalavera100",
-    userKey: "maria",
+    userKey: "juan",
     loftKey: "delaCruzNorth",
     bird: {
       bandNumber: "IFC-2024-0002",
@@ -720,9 +820,45 @@ const raceEntrySeeds = [
   },
 ];
 
-const accessRoleByManagementTitle = {
-  Owner: 1,
-  Secretary: 2,
+const roleIdByLabel = {
+  fancier: 2,
+  guest: 1,
+  member: 2,
+  operator: 20,
+  owner: 11,
+  racer: 2,
+  secretary: 10,
+};
+
+const affiliationDefaultsByManagementTitle = {
+  Owner: {
+    membershipType: "owner",
+    roles: ["owner"],
+  },
+  Secretary: {
+    membershipType: "secretary",
+    roles: ["secretary"],
+  },
+  Operator: {
+    membershipType: "operator",
+    roles: ["operator"],
+  },
+};
+
+const normalizeRoleLabel = (value = "") =>
+  String(value || "")
+    .trim()
+    .toLowerCase()
+    .replace(/[_-]+/g, " ")
+    .replace(/\s+/g, " ");
+
+const getAccessRoleId = ({ affiliationRoles = [], managementTitle = "", membershipType = "" }) => {
+  const primaryRoleLabel =
+    affiliationRoles.find((role) => normalizeRoleLabel(role)) ||
+    membershipType ||
+    managementTitle;
+
+  return roleIdByLabel[normalizeRoleLabel(primaryRoleLabel)] || roleIdByLabel.guest;
 };
 
 const memberCodeByUserKey = {
@@ -733,10 +869,13 @@ const memberCodeByUserKey = {
   carlo: "GHFC-0001",
   liza: "SJLMC-0001",
   roberto: "TRF-0001",
+  oliver: "CFC-0005",
 };
 
+const legacySeedEmails = ["grace.guest@agilatrack.test"];
+
 const resetSeedData = async () => {
-  const seedEmails = userSeeds.map((user) => user.email);
+  const seedEmails = [...new Set([...userSeeds.map((user) => user.email), ...legacySeedEmails])];
   const seedClubCodes = clubSeeds.map((club) => club.code);
   const seedLoftCodes = loftSeeds.map((loft) => loft.code);
   const seedRaceCodes = raceSeeds.map((race) => race.code);
@@ -775,19 +914,29 @@ const resetSeedData = async () => {
 const upsertUser = async (seed) => {
   const place = places[seed.placeKey];
   const user = (await Users.findOne({ email: seed.email })) || new Users();
+  const normalizedManagementRole = normalizeRoleLabel(seed.managementTitle);
+  const seededRole =
+    seed.role ||
+    (["owner", "secretary", "operator"].includes(normalizedManagementRole)
+      ? normalizedManagementRole
+      : seed.skipAffiliation
+        ? "guest"
+        : "member");
 
   user.set({
     email: seed.email,
     password: defaultPassword,
     fullName: seed.fullName,
     mobile: seed.mobile,
-    membership: "regular",
-    state: ["guest"],
+    membership: seed.membership || "regular",
+    state: seed.state || ["guest"],
     isMale: seed.isMale,
+    membershipStatus: seed.skipAffiliation ? "guest" : "active",
     profile: {
-      status: "approved",
+      status: seed.profileStatus || "approved",
       at: new Date(),
     },
+    role: seededRole,
     address: {
       street: "Sample Street",
       barangay: place.barangay,
@@ -797,8 +946,8 @@ const upsertUser = async (seed) => {
       zip: place.zip,
     },
     work: {
-      title: seed.managementTitle || "Racer",
-      company: `${seed.clubKey} racing club`,
+      title: seed.managementTitle || seed.workTitle || "Racer",
+      company: seed.clubKey ? `${seed.clubKey} racing club` : "AgilaTrack",
       province: place.province,
       createdAt: new Date(),
     },
@@ -863,7 +1012,16 @@ const upsertAffiliation = async ({ userSeed, usersByKey, clubsByKey, loftsByKey 
   const user = usersByKey[userSeed.key];
   const club = clubsByKey[userSeed.clubKey];
   const loft = loftsByKey[userSeed.loftKey];
-  const accessRole = accessRoleByManagementTitle[userSeed.managementTitle] || 1;
+  const affiliationDefaults =
+    affiliationDefaultsByManagementTitle[userSeed.managementTitle] || {};
+  const membershipType =
+    userSeed.membershipType || affiliationDefaults.membershipType || "racer";
+  const roles = userSeed.affiliationRoles || affiliationDefaults.roles || [membershipType];
+  const accessRole = getAccessRoleId({
+    affiliationRoles: roles,
+    managementTitle: userSeed.managementTitle,
+    membershipType,
+  });
 
   const affiliation =
     (await Affiliations.findOne({ user: user._id, club: club._id })) ||
@@ -873,8 +1031,8 @@ const upsertAffiliation = async ({ userSeed, usersByKey, clubsByKey, loftsByKey 
     user: user._id,
     club: club._id,
     memberCode: memberCodeByUserKey[userSeed.key],
-    membershipType: "racer",
-    roles: ["racer"],
+    membershipType,
+    roles,
     mobile: user.mobile,
     primaryLoft: loft._id,
     lofts: [loft._id],
@@ -894,7 +1052,7 @@ const upsertAffiliation = async ({ userSeed, usersByKey, clubsByKey, loftsByKey 
     _id: affiliation._id,
     club: club._id,
     role: accessRole,
-    portal: "club",
+    portal: membershipType === "operator" ? "racing" : "club",
     access: [String(accessRole)],
   };
   await user.save();
@@ -934,14 +1092,21 @@ const upsertBird = async ({
   const club = clubsByKey[userSeeds.find((userSeed) => userSeed.key === seed.userKey)?.clubKey];
   const loft = loftsByKey[seed.loftKey];
   const bird = (await Birds.findOne({ bandNumber: seed.bird.bandNumber })) || new Birds();
+  const imageMap = seed.imageUrls || buildSeedBirdImageMap(seed.bird);
 
   bird.set({
     ...seed.bird,
+    approval: {
+      approvedAt: new Date(),
+      requestedAt: new Date(),
+    },
+    approvalStatus: "approved",
     owner: user._id,
     breeder: user._id,
     affiliation: affiliation._id,
     club: club._id,
     loft: loft._id,
+    photos: buildBirdPhotosFromImageMap(imageMap),
     remarks: ["Seeded by seedAgilaTrack.js"],
     status: "active",
   });
@@ -1104,7 +1269,7 @@ const seed = async () => {
 
   const affiliations = [];
   const affiliationsByUserKey = {};
-  for (const userSeed of userSeeds) {
+  for (const userSeed of userSeeds.filter((seed) => !seed.skipAffiliation)) {
     const affiliation = await upsertAffiliation({
       userSeed,
       usersByKey,
@@ -1125,10 +1290,9 @@ const seed = async () => {
 
   const cabanatuanClub = clubsByKey.cabanatuan;
   cabanatuanClub.management = {
-    owner: { user: usersByKey.juan._id },
-    secretary: { user: usersByKey.maria._id },
+    owner: { user: usersByKey.pedro._id },
   };
-  cabanatuanClub.contacts = usersByKey.maria._id;
+  cabanatuanClub.contacts = usersByKey.pedro._id;
   await cabanatuanClub.save();
 
   const birdsByBandNumber = {};

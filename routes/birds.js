@@ -8,15 +8,53 @@ import {
   updateBirdApproval,
   updateBird,
 } from "../controllers/Birds.js";
+import {
+  requireAnyPermission,
+  requireAnyRoleBucket,
+  requireSessionUser,
+} from "../middleware/sessionAuth.js";
+import { validateObjectIdParam } from "../middleware/validateObjectId.js";
+import { validateRequest } from "../middlewares/validateRequest.js";
+import { birdSchemas } from "../validations/schemas.js";
 
 const router = express.Router();
 
-router.get("/", findAll);
-router.post("/upload-photo", uploadBirdPhoto);
-router.put("/:id/approval", updateBirdApproval);
-router.get("/:id", findOne);
-router.post("/", createBird);
-router.put("/:id", updateBird);
-router.delete("/:id", deleteBird);
+router.get("/", requireSessionUser, findAll);
+router.post(
+  "/upload-photo",
+  requireSessionUser,
+  requireAnyPermission("club:manage", "operations:manage", "records:self"),
+  uploadBirdPhoto,
+);
+router.put(
+  "/:id/approval",
+  requireSessionUser,
+  validateObjectIdParam("id"),
+  requireAnyPermission("admin:manage", "club:manage", "operations:manage"),
+  updateBirdApproval,
+);
+router.get("/:id", requireSessionUser, validateObjectIdParam("id"), findOne);
+router.post(
+  "/",
+  requireSessionUser,
+  requireAnyRoleBucket("member", "owner", "secretary"),
+  validateRequest(birdSchemas.create),
+  createBird,
+);
+router.put(
+  "/:id",
+  requireSessionUser,
+  validateObjectIdParam("id"),
+  requireAnyPermission("club:manage", "operations:manage", "records:self"),
+  validateRequest(birdSchemas.update),
+  updateBird,
+);
+router.delete(
+  "/:id",
+  requireSessionUser,
+  validateObjectIdParam("id"),
+  requireAnyPermission("admin:manage", "club:manage", "operations:manage"),
+  deleteBird,
+);
 
 export default router;

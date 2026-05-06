@@ -8,6 +8,8 @@ import Clubs, {
   CLUB_TYPES,
   getClubTypeFromLevel,
 } from "../models/Clubs.js";
+import { listClubs } from "../services/clubService.js";
+import { clearCacheByPrefix } from "../utils/cache.js";
 import { v2 as cloudinary } from "cloudinary";
 
 const __filename = fileURLToPath(import.meta.url);
@@ -69,6 +71,8 @@ refreshCloudinaryConfig();
 
 const sendError = (res, error, status = 400) =>
   res.status(status).json({ error: error.message || error });
+
+const normalizeStatus = (value = "") => String(value || "").trim().toLowerCase();
 
 const normalizeParent = (parent) => {
   if (parent === undefined) return undefined;
@@ -152,12 +156,21 @@ export const findAll = async (req, res) => {
     if (municipalityCode) query["location.municipalityCode"] = municipalityCode;
     if (barangayCode) query["location.barangayCode"] = barangayCode;
 
-    const payload = await Clubs.find(query)
-      .populate("parent", "name level location")
-      .sort({ createdAt: -1 })
-      .lean();
+    const result = await listClubs({
+      filter: query,
+      query: req.query,
+    });
+    const payload = result.data;
 
-    res.json({ success: "Clubs fetched successfully", payload });
+    res.json({
+      success: "Clubs fetched successfully",
+      message: "Clubs fetched successfully",
+      data: payload,
+      payload,
+      page: result.page,
+      totalItems: result.totalItems,
+      totalPages: result.totalPages,
+    });
   } catch (error) {
     sendError(res, error);
   }
@@ -194,8 +207,13 @@ export const findOne = async (req, res) => {
 
 export const createClub = async (req, res) => {
   try {
-    const club = await validateClubHierarchy(req.body);
+    const club = await validateClubHierarchy({
+      ...req.body,
+      isActive: false,
+      status: "pending",
+    });
     const payload = await Clubs.create(club);
+    clearCacheByPrefix("clubs:list");
     res.status(201).json({ success: "Club created successfully", payload });
   } catch (error) {
     sendError(res, error);
@@ -208,6 +226,13 @@ export const updateClub = async (req, res) => {
     if (!payload) return res.status(404).json({ error: "Club not found" });
 
     payload.set(req.body);
+    const nextStatus = normalizeStatus(payload.status);
+
+    if (nextStatus === "approved") {
+      payload.isActive = true;
+    } else if (["declined", "pending"].includes(nextStatus)) {
+      payload.isActive = false;
+    }
 
     const club = await validateClubHierarchy(
       payload.toObject(),
@@ -215,6 +240,7 @@ export const updateClub = async (req, res) => {
     );
     payload.parent = club.parent;
     await payload.save();
+    clearCacheByPrefix("clubs:list");
 
     res.json({ success: "Club updated successfully", payload });
   } catch (error) {
@@ -230,6 +256,7 @@ export const deleteClub = async (req, res) => {
       { new: true },
     );
     if (!payload) return res.status(404).json({ error: "Club not found" });
+    clearCacheByPrefix("clubs:list");
 
     res.json({ success: "Club deleted successfully", payload });
   } catch (error) {
@@ -317,6 +344,7 @@ export const uploadClubLogo = async (req, res) => {
         runValidators: false,
       },
     );
+    clearCacheByPrefix("clubs:list");
 
     return res.status(201).json({
       success: "Club logo uploaded successfully",

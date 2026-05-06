@@ -38,6 +38,10 @@ const sharedRouteGroups = [
   { path: "/users", description: "Manage users and user profiles" },
   { path: "/affiliations", description: "Manage user club memberships and racing profiles" },
   {
+    path: "/chatbot",
+    description: "Deterministic chatbot endpoints for verified database-backed answers and suggestions",
+  },
+  {
     path: "/affiliations/club-dashboard/:clubId",
     description: "Fetch the live club membership dashboard for a specific club",
   },

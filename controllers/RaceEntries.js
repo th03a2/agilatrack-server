@@ -2,13 +2,22 @@ import Affiliations from "../models/Affiliations.js";
 import Lofts from "../models/Lofts.js";
 import RaceEntries from "../models/RaceEntries.js";
 import Races from "../models/Races.js";
+import { canManageClubWorkspace } from "../middleware/sessionAuth.js";
+import { clearCacheByPrefix } from "../utils/cache.js";
 
 const sendError = (res, error, status = 400) =>
   res.status(status).json({ error: error.message || error });
 
 const populateEntry = (query) =>
   query
-    .populate("race", "name code raceDate status departure club")
+    .populate({
+      path: "race",
+      select: "name code raceDate status departure club booking",
+      populate: {
+        path: "club",
+        select: "name code abbr level location",
+      },
+    })
     .populate({
       path: "affiliation",
       select: "memberCode status membershipType roles racing user club primaryLoft",
@@ -121,6 +130,14 @@ export const bookEntry = async (req, res) => {
     if (String(affiliation.club) !== String(race.club)) {
       throw new Error("Affiliation club must match the race club.");
     }
+    if (
+      String(affiliation.user || "") !== String(req.auth?.userId || "") &&
+      !canManageClubWorkspace(req.auth, String(race.club || ""))
+    ) {
+      return res.status(403).json({
+        error: "You can only book race entries for your own affiliation.",
+      });
+    }
     if (String(loft.club) !== String(race.club)) {
       throw new Error("Loft club must match the race club.");
     }
@@ -141,6 +158,7 @@ export const bookEntry = async (req, res) => {
     });
 
     res.status(201).json({ success: "Race entry booked successfully", payload });
+    clearCacheByPrefix("dashboard:stats");
   } catch (error) {
     sendError(res, error);
   }
@@ -276,6 +294,7 @@ export const updateEntry = async (req, res) => {
     });
 
     res.json({ success: "Race entry updated successfully", payload });
+    clearCacheByPrefix("dashboard:stats");
   } catch (error) {
     sendError(res, error);
   }
@@ -299,6 +318,7 @@ export const deleteEntry = async (req, res) => {
     }
 
     res.json({ success: "Race entry archived successfully", payload });
+    clearCacheByPrefix("dashboard:stats");
   } catch (error) {
     sendError(res, error);
   }

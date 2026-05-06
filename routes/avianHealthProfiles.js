@@ -6,13 +6,32 @@ import {
   findOne,
   updateProfile,
 } from "../controllers/AvianHealthProfiles.js";
+import { requireAnyPermission, requireSessionUser } from "../middleware/sessionAuth.js";
+import { validateObjectIdParam } from "../middleware/validateObjectId.js";
 
 const router = express.Router();
 
-router.get("/", findAll);
-router.get("/:id", findOne);
-router.post("/", createProfile);
-router.put("/:id", updateProfile);
-router.delete("/:id", deleteProfile);
+router.get("/", requireSessionUser, findAll);
+router.get("/:id", requireSessionUser, validateObjectIdParam("id"), findOne);
+router.post(
+  "/",
+  requireSessionUser,
+  requireAnyPermission("club:manage", "records:self"),
+  createProfile,
+);
+router.put(
+  "/:id",
+  requireSessionUser,
+  validateObjectIdParam("id"),
+  requireAnyPermission("club:manage", "records:self"),
+  updateProfile,
+);
+router.delete(
+  "/:id",
+  requireSessionUser,
+  validateObjectIdParam("id"),
+  requireAnyPermission("admin:manage", "club:manage"),
+  deleteProfile,
+);
 
 export default router;

@@ -37,6 +37,7 @@ const userSchema = new Schema(
   {
     //Profile ID in Cloudinary
     pid: { type: String },
+    profilePhoto: { type: String, trim: true },
     profile: {
       status: {
         type: String,
@@ -111,6 +112,29 @@ const userSchema = new Schema(
         },
       ],
     },
+    clubId: {
+      type: Schema.Types.ObjectId,
+      ref: "Clubs",
+      default: null,
+    },
+    membershipStatus: {
+      type: String,
+      enum: ["guest", "pending", "active", "denied", "inactive"],
+      default: "guest",
+      trim: true,
+      lowercase: true,
+    },
+    profileCompleted: {
+      type: Boolean,
+      default: false,
+    },
+    role: {
+      type: String,
+      enum: ["guest", "member", "owner", "secretary", "operator", "admin"],
+      default: "guest",
+      trim: true,
+      lowercase: true,
+    },
     address: AddressSchema,
     parents: {
       father: parentSchema,
@@ -151,7 +175,7 @@ const userSchema = new Schema(
       type: String,
       trim: true,
       lowercase: true,
-      default: "regular",
+      default: "guest",
     },
     state: [
       {
@@ -189,6 +213,7 @@ const userSchema = new Schema(
 
     // this files is id in cloudinary
     files: {
+      profile: { type: String },
       signature: { type: String }, //signature and profile
       application: { type: String },
       resume: { type: String },
@@ -215,8 +240,20 @@ const userSchema = new Schema(
   },
   {
     timestamps: true,
-    toJSON: { virtuals: true },
-    toObject: { virtuals: true },
+    toJSON: {
+      transform: (_, ret) => {
+        delete ret.password;
+        return ret;
+      },
+      virtuals: true,
+    },
+    toObject: {
+      transform: (_, ret) => {
+        delete ret.password;
+        return ret;
+      },
+      virtuals: true,
+    },
   },
 );
 

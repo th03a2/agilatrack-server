@@ -1,68 +1,28 @@
-import crypto from "node:crypto";
 import { v2 as cloudinary } from "cloudinary";
 import Users from "../models/Users.js";
+import {
+  getTokenFromRequest,
+  normalizeFlag,
+  normalizeText,
+  verifySessionToken,
+} from "../utils/auth.js";
 
-const AUTH_TOKEN_TTL_MS = 1000 * 60 * 60 * 24 * 30;
 const ALLOWED_UPLOAD_MIME_TYPES = new Set([
   "image/jpeg",
   "image/jpg",
   "image/png",
   "image/webp",
 ]);
-const MAX_UPLOAD_IMAGE_BYTES = 8 * 1024 * 1024;
+const MAX_UPLOAD_IMAGE_BYTES = 10 * 1024 * 1024;
 const MULTIPART_HEADER_SEPARATOR = Buffer.from("\r\n\r\n");
 const MULTIPART_LINE_BREAK = Buffer.from("\r\n");
 
-const normalizeText = (value = "") => String(value || "").trim();
-const normalizeFlag = (value = "") => normalizeText(value).toLowerCase();
 const encodePathSegment = (value = "") =>
   normalizeFlag(value)
     .replace(/[^a-z0-9._-]+/g, "-")
     .replace(/^-+|-+$/g, "") || "asset";
-const getAuthTokenSecret = () =>
-  normalizeText(process.env.AUTH_TOKEN_SECRET || process.env.JWT_SECRET) ||
-  "agilatrack-dev-secret";
 const createStatusError = (message, status = 400) =>
   Object.assign(new Error(message), { status });
-const fromBase64Url = (value) => Buffer.from(value, "base64url").toString("utf8");
-
-const signTokenPayload = (payload) =>
-  crypto
-    .createHmac("sha256", getAuthTokenSecret())
-    .update(payload)
-    .digest("base64url");
-
-const verifySessionToken = (token) => {
-  const [encodedPayload = "", signature = ""] = String(token || "").split(".");
-  if (!encodedPayload || !signature) return null;
-
-  const expectedSignature = signTokenPayload(encodedPayload);
-  if (signature !== expectedSignature) return null;
-
-  try {
-    const parsed = JSON.parse(fromBase64Url(encodedPayload));
-    if (!parsed?.userId || !parsed?.issuedAt) return null;
-    if (Date.now() - Number(parsed.issuedAt) > AUTH_TOKEN_TTL_MS) return null;
-    return parsed;
-  } catch {
-    return null;
-  }
-};
-
-const getTokenFromRequest = (req) => {
-  const rawHeader = normalizeText(req.headers.authorization);
-  if (!rawHeader) return "";
-
-  if (/^QTracy\s+/i.test(rawHeader)) {
-    return rawHeader.replace(/^QTracy\s+/i, "").trim();
-  }
-
-  if (/^Bearer\s+/i.test(rawHeader)) {
-    return rawHeader.replace(/^Bearer\s+/i, "").trim();
-  }
-
-  return rawHeader;
-};
 
 const getMultipartBoundary = (contentType = "") => {
   const match = String(contentType || "").match(/boundary=(?:"([^"]+)"|([^;]+))/i);
@@ -169,7 +129,7 @@ const validateUploadMimeType = (mimeType = "") => {
 
 const validateUploadSize = (size = 0) => {
   if (Number(size || 0) > MAX_UPLOAD_IMAGE_BYTES) {
-    throw createStatusError("Uploaded images must be 8 MB or smaller.");
+    throw createStatusError("Uploaded images must be 10 MB or smaller.");
   }
 };
 
@@ -238,7 +198,7 @@ export const uploadAsset = async (req, res) => {
   try {
     if (!refreshCloudinaryConfig()) {
       return res.status(500).json({
-        error: "Cloudinary is not configured",
+        error: "Cloudinary is not configured on the server.",
         message:
           "Add CLOUDINARY_CLOUD_NAME, CLOUDINARY_API_KEY, and CLOUDINARY_API_SECRET to server/.env.",
       });
@@ -301,6 +261,7 @@ export const uploadAsset = async (req, res) => {
       user.pid = uploadResult.version
         ? String(uploadResult.version)
         : uploadResult.asset_id;
+      user.profilePhoto = uploadResult.secure_url;
       user.files = {
         ...(user.files?.toObject?.() || user.files || {}),
         profile: user.pid,

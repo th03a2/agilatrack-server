@@ -70,6 +70,31 @@ const BIRD_IMAGE_KEY_BY_TYPE = Object.fromEntries(
   BIRD_IMAGE_FIELDS.map((field) => [field.type, field.key]),
 );
 
+const buildCloudinaryAssetUrl = ({ publicId = "", source = "" } = {}) => {
+  const normalizedSource = String(source || "").trim();
+
+  if (
+    /^(https?:)?\/\//i.test(normalizedSource) ||
+    normalizedSource.startsWith("data:image/") ||
+    normalizedSource.startsWith("/")
+  ) {
+    return normalizedSource;
+  }
+
+  const normalizedPublicId = String(publicId || "").trim();
+  const cloudName = String(process.env.CLOUDINARY_CLOUD_NAME || "").trim();
+  const uploadTarget = normalizedSource || normalizedPublicId;
+
+  if (!uploadTarget || !cloudName) {
+    return normalizedSource;
+  }
+
+  return `https://res.cloudinary.com/${cloudName}/image/upload/${uploadTarget.replace(
+    /^\/+/,
+    "",
+  )}`;
+};
+
 export function createEmptyBirdImageMap() {
   return BIRD_IMAGE_FIELDS.reduce(
     (imageMap, field) => ({
@@ -103,7 +128,10 @@ export function buildBirdImageMap(source = {}) {
 
       const type = String(photo.type || "").trim();
       const key = BIRD_IMAGE_KEY_BY_TYPE[type];
-      const imageUrl = String(photo.source || "").trim();
+      const imageUrl = buildCloudinaryAssetUrl({
+        publicId: photo.publicId,
+        source: photo.source,
+      });
 
       if (key && imageUrl) {
         images[key] = imageUrl;
@@ -112,7 +140,9 @@ export function buildBirdImageMap(source = {}) {
   }
 
   if (!images.mainPhoto && typeof source?.birdImage === "string" && source.birdImage.trim()) {
-    images.mainPhoto = source.birdImage.trim();
+    images.mainPhoto = buildCloudinaryAssetUrl({
+      source: source.birdImage,
+    });
   }
 
   return images;
@@ -308,6 +338,15 @@ const modelSchema = new Schema(
       ref: "Clubs",
       required: true,
     },
+    clubId: {
+      type: Schema.Types.ObjectId,
+      ref: "Clubs",
+    },
+    ownerId: {
+      type: Schema.Types.ObjectId,
+      ref: "Users",
+      required: true,
+    },
     owner: {
       type: Schema.Types.ObjectId,
       ref: "Users",
@@ -413,6 +452,22 @@ modelSchema.virtual("birdImage").get(function getLegacyBirdImage() {
 });
 
 modelSchema.pre("validate", function normalizeBird(next) {
+  if (!this.ownerId && this.owner) {
+    this.ownerId = this.owner;
+  }
+
+  if (!this.owner && this.ownerId) {
+    this.owner = this.ownerId;
+  }
+
+  if (!this.clubId && this.club) {
+    this.clubId = this.club;
+  }
+
+  if (!this.club && this.clubId) {
+    this.club = this.clubId;
+  }
+
   if (!this.hatchYear && this.hatchDate) {
     this.hatchYear = this.hatchDate.getFullYear();
   }
@@ -446,9 +501,11 @@ modelSchema.index(
   },
 );
 modelSchema.index({ owner: 1, status: 1, deletedAt: 1 });
+modelSchema.index({ ownerId: 1, status: 1, deletedAt: 1 });
 modelSchema.index({ affiliation: 1, status: 1, deletedAt: 1 });
 modelSchema.index({ loft: 1, status: 1, deletedAt: 1 });
 modelSchema.index({ club: 1, status: 1, createdAt: -1 });
+modelSchema.index({ clubId: 1, status: 1, createdAt: -1 });
 
 const Entity = mongoose.model("Birds", modelSchema);
 

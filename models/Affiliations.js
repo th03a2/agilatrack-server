@@ -48,6 +48,18 @@ const approvalSchema = new Schema(
 
 const applicationSchema = new Schema(
   {
+    address: {
+      type: String,
+      trim: true,
+    },
+    email: {
+      type: String,
+      trim: true,
+    },
+    fullName: {
+      type: String,
+      trim: true,
+    },
     loftName: {
       type: String,
       trim: true,
@@ -56,7 +68,23 @@ const applicationSchema = new Schema(
       type: String,
       trim: true,
     },
+    photos: {
+      type: [String],
+      default: [],
+    },
+    recommenderName: {
+      type: String,
+      trim: true,
+    },
     reasonForJoining: {
+      type: String,
+      trim: true,
+    },
+    signatureDate: {
+      type: String,
+      trim: true,
+    },
+    signatureName: {
       type: String,
       trim: true,
     },
