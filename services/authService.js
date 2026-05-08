@@ -27,7 +27,7 @@ const ENV_PATH = path.join(__dirname, "..", ".env");
 
 const USER_SELECT =
   "_id email username isEmailVerified emailVerifiedAt fullName activePlatform clubId membership membershipStatus profileCompleted role state mobile isMale pid profilePhoto files profile isActive createdAt updatedAt";
-const MOBILE_PORTAL = "guest";
+const MOBILE_PORTAL = "club";
 const VERIFICATION_CODE_LENGTH = 6;
 const VERIFICATION_TTL_MS = 1000 * 60 * 10;
 const VERIFICATION_TTL_MINUTES = VERIFICATION_TTL_MS / (1000 * 60);
@@ -372,13 +372,8 @@ const isProfileComplete = (user = {}) => {
 };
 
 const buildAffiliationPlatform = (affiliation, { isMobile }) => {
-  const clubId =
-    affiliation?.club && typeof affiliation.club === "object"
-      ? affiliation.club?._id
-      : affiliation?.club;
-  const primaryRole = resolvePrimaryAffiliationRole({
-    affiliation,
-  });
+  const clubId = affiliation?.club?._id || affiliation?.club;
+  const primaryRole = resolvePrimaryAffiliationRole(affiliation);
 
   return {
     _id: affiliation?._id || null,

@@ -812,10 +812,16 @@ export const updateAffiliation = async (req, res) => {
       });
     }
 
+    const requestedStatus = normalizeFlag(req.body?.status);
+    const isSelfCancellation =
+      isOwner &&
+      requestedStatus === "deactivated" &&
+      normalizeFlag(affiliation.status) === "pending";
+
     if (
       canManage &&
       isOwnerAffiliation(affiliation) &&
-      normalizeFlag(req.body?.status) === "deactivated"
+      requestedStatus === "deactivated"
     ) {
       return res.status(400).json({
         error: "The club owner account must stay active and cannot be suspended or archived.",
@@ -827,6 +833,28 @@ export const updateAffiliation = async (req, res) => {
 
     if (canManage) {
       affiliation.set(req.body);
+    } else if (isSelfCancellation) {
+      const cancellationReason =
+        normalizeText(req.body?.approval?.reason) || "Cancelled by applicant.";
+      const existingRemarks = Array.isArray(affiliation.remarks)
+        ? affiliation.remarks
+        : [];
+
+      affiliation.set({
+        approval: {
+          ...((affiliation.approval?.toObject?.() || affiliation.approval || {})),
+          reason: cancellationReason,
+        },
+        deactivated: {
+          ...((affiliation.deactivated?.toObject?.() || affiliation.deactivated || {})),
+          at: new Date().toISOString(),
+          by: req.auth?.userId,
+        },
+        remarks: existingRemarks.includes(cancellationReason)
+          ? existingRemarks
+          : [...existingRemarks, cancellationReason],
+        status: "deactivated",
+      });
     } else {
       affiliation.set({
         application:
