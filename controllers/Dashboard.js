@@ -1,15 +1,26 @@
-import { canAccessClubWorkspace, hasPermission } from "../middleware/sessionAuth.js";
+import {
+  denyTenantAccess,
+  isTenantSuperAdmin,
+  resolveTenantClubId,
+} from "../middleware/tenantIsolation.js";
 import { getDashboardStats } from "../services/dashboardService.js";
 
 export const getStats = async (req, res, next) => {
   try {
-    const clubId = String(req.query?.club || req.query?.clubId || "").trim();
+    const requestedClubId = String(req.query?.club || req.query?.clubId || "").trim();
+    const clubId = await resolveTenantClubId(req, res, {
+      requestedClubId,
+      requireClub: !isTenantSuperAdmin(req.auth),
+    });
 
-    if (clubId && !canAccessClubWorkspace(req.auth, clubId) && !hasPermission(req.auth, "admin:manage")) {
-      return res.status(403).json({
-        success: false,
-        message: "You do not have access to this dashboard scope.",
-        error: "You do not have access to this dashboard scope.",
+    if (clubId === null) {
+      return null;
+    }
+
+    if (!clubId && !isTenantSuperAdmin(req.auth)) {
+      return denyTenantAccess(req, res, {
+        attemptedClubId: requestedClubId,
+        reason: "Dashboard stats requested without an assigned club.",
       });
     }
 

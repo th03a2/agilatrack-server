@@ -1,5 +1,14 @@
 import mongoose from "mongoose";
 import PortalStates from "../models/PortalState.js";
+import {
+  canAccessTenantClub,
+  canManageTenantClub,
+  denyTenantAccess,
+  getPrimaryTenantClubId,
+  isTenantSuperAdmin,
+  normalizeTenantId,
+  scopeQueryToTenant,
+} from "../middleware/tenantIsolation.js";
 
 const sendError = (res, error, status = 400) =>
   res.status(status).json({ error: error.message || error });
@@ -24,7 +33,17 @@ const buildQuery = (query = {}) => {
 
 export const findAll = async (req, res) => {
   try {
-    const payload = await PortalStates.find(buildQuery(req.query))
+    const dbQuery = buildQuery(req.query);
+    const allowed = await scopeQueryToTenant(req, res, dbQuery, {
+      field: "club",
+      requestedClubId: req.query?.club || req.query?.clubId,
+    });
+
+    if (!allowed) {
+      return null;
+    }
+
+    const payload = await PortalStates.find(dbQuery)
       .populate("club", "name code abbr level location")
       .populate("updatedBy", "fullName email mobile")
       .sort({ updatedAt: -1, createdAt: -1 })
@@ -50,11 +69,26 @@ export const upsertOne = async (req, res) => {
       throw new Error("Domain, module, entity type, and entity id are required.");
     }
 
+    const targetClubId =
+      normalizeTenantId(req.body?.club) ||
+      normalizeTenantId(req.query?.club || req.query?.clubId) ||
+      getPrimaryTenantClubId(req.auth);
+
+    if (!targetClubId && !isTenantSuperAdmin(req.auth)) {
+      return denyTenantAccess(req, res, {
+        reason: "Portal state update requires an assigned club.",
+      });
+    }
+
+    if (targetClubId && !canAccessTenantClub(req.auth, targetClubId)) {
+      return denyTenantAccess(req, res, {
+        attemptedClubId: targetClubId,
+        reason: "Portal state update attempted outside the authenticated user's tenant.",
+      });
+    }
+
     const update = {
-      club:
-        req.body.club && mongoose.Types.ObjectId.isValid(req.body.club)
-          ? req.body.club
-          : undefined,
+      club: targetClubId && mongoose.Types.ObjectId.isValid(targetClubId) ? targetClubId : undefined,
       data:
         req.body.data && typeof req.body.data === "object" ? req.body.data : {},
       deletedAt: undefined,
@@ -71,7 +105,7 @@ export const upsertOne = async (req, res) => {
     };
 
     const payload = await PortalStates.findOneAndUpdate(
-      { deletedAt: { $exists: false }, domain, entityId, entityType, module },
+      { club: update.club, deletedAt: { $exists: false }, domain, entityId, entityType, module },
       update,
       {
         new: true,
@@ -99,8 +133,31 @@ export const deleteOne = async (req, res) => {
     const entityType = normalizeText(req.params.entityType).toLowerCase();
     const entityId = normalizeText(req.params.entityId);
 
+    const currentRecord = await PortalStates.findOne({
+      deletedAt: { $exists: false },
+      domain,
+      entityId,
+      entityType,
+      module,
+    })
+      .select("club")
+      .lean();
+
+    if (!currentRecord) {
+      return res.status(404).json({ error: "Portal state record not found" });
+    }
+
+    const clubId = normalizeTenantId(currentRecord.club);
+
+    if (!canManageTenantClub(req.auth, clubId)) {
+      return denyTenantAccess(req, res, {
+        attemptedClubId: clubId,
+        reason: "Portal state archive attempted outside the authenticated user's tenant.",
+      });
+    }
+
     const payload = await PortalStates.findOneAndUpdate(
-      { deletedAt: { $exists: false }, domain, entityId, entityType, module },
+      { club: clubId, deletedAt: { $exists: false }, domain, entityId, entityType, module },
       { deletedAt: new Date().toISOString() },
       { new: true },
     ).lean({ virtuals: true });

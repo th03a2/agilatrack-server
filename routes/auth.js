@@ -1,9 +1,13 @@
 import express from "express";
 import rateLimit from "express-rate-limit";
 import {
+  facebookOAuthCallback,
   getCurrentUser,
+  googleOAuthCallback,
   login,
   register,
+  redirectToFacebookOAuth,
+  redirectToGoogleOAuth,
   sendVerificationCode,
   update,
   uploadProfile,
@@ -29,6 +33,10 @@ const authLimiter = rateLimit({
 });
 
 router.post("/login", authLimiter, validateRequest(authSchemas.login), login);
+router.get("/google", redirectToGoogleOAuth);
+router.get("/google/callback", googleOAuthCallback);
+router.get("/facebook", redirectToFacebookOAuth);
+router.get("/facebook/callback", facebookOAuthCallback);
 router.get("/me", getCurrentUser);
 router.post("/send-verification-code", sendVerificationCode);
 router.post("/verify-email-code", verifyEmailCode);

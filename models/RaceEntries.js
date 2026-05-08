@@ -3,9 +3,13 @@ import mongoose from "mongoose";
 const { Schema } = mongoose;
 
 export const RACE_ENTRY_STATUSES = [
+  "pending",
   "booked",
   "checked_in",
+  "basketed",
   "boarded",
+  "released",
+  "liberated",
   "departed",
   "arrived",
   "dnf",
@@ -155,10 +159,26 @@ const modelSchema = new Schema(
       ref: "Races",
       required: true,
     },
+    raceId: {
+      type: Schema.Types.ObjectId,
+      ref: "Races",
+    },
+    clubId: {
+      type: Schema.Types.ObjectId,
+      ref: "Clubs",
+    },
     affiliation: {
       type: Schema.Types.ObjectId,
       ref: "Affiliations",
       required: true,
+    },
+    fancierId: {
+      type: Schema.Types.ObjectId,
+      ref: "Users",
+    },
+    pigeonId: {
+      type: Schema.Types.ObjectId,
+      ref: "Birds",
     },
     loft: {
       type: Schema.Types.ObjectId,
@@ -210,6 +230,11 @@ const modelSchema = new Schema(
         trim: true,
         uppercase: true,
       },
+      cancelledAt: { type: Date },
+      cancelledBy: {
+        type: Schema.Types.ObjectId,
+        ref: "Users",
+      },
       remarks: { type: String, trim: true },
     },
     checkIn: {
@@ -252,6 +277,16 @@ const modelSchema = new Schema(
         min: 1,
       },
       sealNumber: {
+        type: String,
+        trim: true,
+        uppercase: true,
+      },
+      basketedAt: { type: Date },
+      basketedBy: {
+        type: Schema.Types.ObjectId,
+        ref: "Users",
+      },
+      scanCode: {
         type: String,
         trim: true,
         uppercase: true,
@@ -305,6 +340,14 @@ const modelSchema = new Schema(
       enum: RACE_ENTRY_STATUSES,
       default: "booked",
     },
+    createdBy: {
+      type: Schema.Types.ObjectId,
+      ref: "Users",
+    },
+    updatedBy: {
+      type: Schema.Types.ObjectId,
+      ref: "Users",
+    },
     deletedAt: { type: String },
   },
   {
@@ -356,6 +399,14 @@ modelSchema.virtual("arrivalPlace").get(function getArrivalPlace() {
 });
 
 modelSchema.pre("validate", function validateRaceEntry(next) {
+  if (!this.raceId && this.race) {
+    this.raceId = this.race;
+  }
+
+  if (!this.race && this.raceId) {
+    this.race = this.raceId;
+  }
+
   if (!this.departure?.coordinates && this.departure?.station?.coordinates) {
     this.departure.coordinates = this.departure.station.coordinates;
   }
@@ -367,7 +418,7 @@ modelSchema.pre("validate", function validateRaceEntry(next) {
     this.checkIn.checkedInAt = new Date();
   }
 
-  if (this.status === "boarded" && !this.boarding?.crateNumber) {
+  if (["basketed", "boarded"].includes(this.status) && !this.boarding?.crateNumber) {
     return next(new Error("Crate number is required once bird is boarded."));
   }
 
@@ -430,6 +481,9 @@ modelSchema.statics.recalculateRanks = async function recalculateRanks(raceId) {
 
 modelSchema.index({ race: 1, "bird.bandNumber": 1 }, { unique: true });
 modelSchema.index({ race: 1, status: 1, deletedAt: 1 });
+modelSchema.index({ clubId: 1, status: 1, deletedAt: 1 });
+modelSchema.index({ fancierId: 1, createdAt: -1 });
+modelSchema.index({ pigeonId: 1, createdAt: -1 });
 modelSchema.index({ race: 1, "result.rank": 1 });
 modelSchema.index({ affiliation: 1, createdAt: -1 });
 modelSchema.index({ loft: 1, createdAt: -1 });

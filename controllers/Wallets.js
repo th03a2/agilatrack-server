@@ -4,6 +4,14 @@ import Birds from "../models/Birds.js";
 import Races from "../models/Races.js";
 import Users from "../models/Users.js";
 import Wallets from "../models/Wallets.js";
+import {
+  canAccessTenantClub,
+  canManageTenantClub,
+  denyTenantAccess,
+  getPrimaryTenantClubId,
+  normalizeTenantId,
+  scopeQueryToTenant,
+} from "../middleware/tenantIsolation.js";
 
 const sendError = (res, error, status = 400) =>
   res.status(status).json({ error: error.message || error });
@@ -122,9 +130,39 @@ const ensureBird = async (birdId) => {
 const saveWalletAndRespond = async (walletId) =>
   populateWallet(Wallets.findById(walletId)).lean({ virtuals: true });
 
+const assertWalletTenantAccess = async (req, res, wallet, { manage = false } = {}) => {
+  const clubId = normalizeTenantId(wallet?.club);
+  const isOwnWallet = normalizeTenantId(wallet?.user) === normalizeTenantId(req.auth?.userId);
+  const allowed = manage
+    ? canManageTenantClub(req.auth, clubId)
+    : isOwnWallet || canAccessTenantClub(req.auth, clubId);
+
+  if (!allowed) {
+    await denyTenantAccess(req, res, {
+      attemptedClubId: clubId,
+      reason: manage
+        ? "Wallet action attempted outside the authenticated user's managed club."
+        : "Wallet request targeted another club.",
+    });
+    return false;
+  }
+
+  return true;
+};
+
 export const findAll = async (req, res) => {
   try {
-    const payload = await populateWallet(Wallets.find(buildWalletQuery(req.query)))
+    const dbQuery = buildWalletQuery(req.query);
+    const allowed = await scopeQueryToTenant(req, res, dbQuery, {
+      field: "club",
+      requestedClubId: req.query?.club || req.query?.clubId,
+    });
+
+    if (!allowed) {
+      return null;
+    }
+
+    const payload = await populateWallet(Wallets.find(dbQuery))
       .sort({ createdAt: -1 })
       .lean({ virtuals: true });
 
@@ -142,6 +180,13 @@ export const findOne = async (req, res) => {
 
     if (!payload || payload.deletedAt) {
       return res.status(404).json({ error: "Wallet not found" });
+    }
+
+    if (!canAccessTenantClub(req.auth, normalizeTenantId(payload.club))) {
+      return denyTenantAccess(req, res, {
+        attemptedClubId: normalizeTenantId(payload.club),
+        reason: "Wallet detail request targeted another club.",
+      });
     }
 
     res.json({ success: "Wallet fetched successfully", payload });
@@ -164,13 +209,33 @@ export const createWallet = async (req, res) => {
 
     await ensureUser(user);
     const linkedAffiliation = await ensureAffiliation(affiliation);
-    ensureObjectId(club, "Club");
+    const targetClubId =
+      normalizeTenantId(club) ||
+      normalizeTenantId(linkedAffiliation?.club) ||
+      getPrimaryTenantClubId(req.auth);
+    ensureObjectId(targetClubId, "Club");
     ensureObjectId(initiatedBy, "Initiated by");
+
+    if (
+      linkedAffiliation?.club &&
+      normalizeTenantId(linkedAffiliation.club) !== targetClubId
+    ) {
+      throw new Error("Wallet affiliation club must match the wallet club.");
+    }
+
+    const isSelfWallet = normalizeTenantId(user) === normalizeTenantId(req.auth?.userId);
+
+    if (!canManageTenantClub(req.auth, targetClubId) && !(isSelfWallet && canAccessTenantClub(req.auth, targetClubId))) {
+      return denyTenantAccess(req, res, {
+        attemptedClubId: targetClubId,
+        reason: "Wallet creation attempted outside the authenticated user's tenant.",
+      });
+    }
 
     const wallet = new Wallets({
       user,
       ownerType,
-      club: club || linkedAffiliation?.club,
+      club: targetClubId,
       affiliation,
       ...rest,
     });
@@ -201,6 +266,12 @@ export const createWallet = async (req, res) => {
 export const preloadWallet = async (req, res) => {
   try {
     const wallet = await ensureWallet(req.params.id);
+    const allowed = await assertWalletTenantAccess(req, res, wallet, { manage: true });
+
+    if (!allowed) {
+      return null;
+    }
+
     const amount = ensurePositiveAmount(req.body.amount, "Preload amount");
 
     wallet.addTransaction({
@@ -230,6 +301,15 @@ export const transferLoad = async (req, res) => {
     const sourceWallet = await ensureWallet(req.params.id);
     const targetWallet = await ensureWallet(req.body.targetWalletId);
     const amount = ensurePositiveAmount(req.body.amount, "Transfer amount");
+
+    const canUseSource = await assertWalletTenantAccess(req, res, sourceWallet, { manage: true });
+    const canUseTarget = canUseSource
+      ? await assertWalletTenantAccess(req, res, targetWallet, { manage: true })
+      : false;
+
+    if (!canUseSource || !canUseTarget) {
+      return null;
+    }
 
     if (String(sourceWallet._id) === String(targetWallet._id)) {
       throw new Error("Source and target wallet must be different.");
@@ -297,11 +377,21 @@ export const transferLoad = async (req, res) => {
 export const chargeBirdRegistrationFee = async (req, res) => {
   try {
     const wallet = await ensureWallet(req.params.id);
+    const allowed = await assertWalletTenantAccess(req, res, wallet);
+
+    if (!allowed) {
+      return null;
+    }
+
     const amount = ensurePositiveAmount(
       req.body.amount || wallet.settings?.defaultBirdRegistrationFee,
       "Bird registration fee",
     );
     const bird = await ensureBird(req.body.pigeon || req.body.bird);
+
+    if (bird && normalizeTenantId(bird.club || bird.clubId) !== normalizeTenantId(wallet.club)) {
+      throw new Error("Bird registration fee must stay within the wallet club.");
+    }
 
     wallet.addTransaction({
       type: "bird_registration_fee",
@@ -336,8 +426,18 @@ export const chargeBirdRegistrationFee = async (req, res) => {
 export const chargeRaceFee = async (req, res) => {
   try {
     const wallet = await ensureWallet(req.params.id);
+    const allowed = await assertWalletTenantAccess(req, res, wallet);
+
+    if (!allowed) {
+      return null;
+    }
+
     const amount = ensurePositiveAmount(req.body.amount, "Race fee");
     const race = await ensureRace(req.body.race);
+
+    if (race && normalizeTenantId(race.club) !== normalizeTenantId(wallet.club)) {
+      throw new Error("Race fee must stay within the wallet club.");
+    }
 
     wallet.addTransaction({
       type: "race_fee",
@@ -368,6 +468,12 @@ export const chargeRaceFee = async (req, res) => {
 export const requestRecharge = async (req, res) => {
   try {
     const wallet = await ensureWallet(req.params.id);
+    const allowed = await assertWalletTenantAccess(req, res, wallet);
+
+    if (!allowed) {
+      return null;
+    }
+
     const amount = ensurePositiveAmount(req.body.amount, "Recharge amount");
 
     wallet.transactions.push({
@@ -407,7 +513,16 @@ export const updateWallet = async (req, res) => {
       return res.status(404).json({ error: "Wallet not found" });
     }
 
-    wallet.set(req.body);
+    const allowed = await assertWalletTenantAccess(req, res, wallet);
+
+    if (!allowed) {
+      return null;
+    }
+
+    wallet.set({
+      ...req.body,
+      club: wallet.club,
+    });
     await wallet.save();
 
     const payload = await saveWalletAndRespond(wallet._id);
@@ -419,6 +534,18 @@ export const updateWallet = async (req, res) => {
 
 export const deleteWallet = async (req, res) => {
   try {
+    const wallet = await Wallets.findById(req.params.id).select("club user").lean();
+
+    if (!wallet) {
+      return res.status(404).json({ error: "Wallet not found" });
+    }
+
+    const allowed = await assertWalletTenantAccess(req, res, wallet, { manage: true });
+
+    if (!allowed) {
+      return null;
+    }
+
     const payload = await populateWallet(
       Wallets.findByIdAndUpdate(
         req.params.id,

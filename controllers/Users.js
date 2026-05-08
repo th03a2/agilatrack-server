@@ -1,8 +1,15 @@
+import Affiliations from "../models/Affiliations.js";
 import Users from "../models/Users.js";
 import {
-  canAccessUserRecord,
   hasPrivilegedDirectoryAccess,
 } from "../middleware/sessionAuth.js";
+import {
+  denyTenantAccess,
+  getAccessibleClubIds,
+  getPrimaryTenantClubId,
+  isTenantSuperAdmin,
+  normalizeTenantId,
+} from "../middleware/tenantIsolation.js";
 import { listUsers } from "../services/userService.js";
 
 const USER_SELECT = "-password -__v";
@@ -223,16 +230,62 @@ const buildUserQuery = (query = {}) => {
   return dbQuery;
 };
 
+const getTenantUserIds = async (auth = {}) => {
+  const accessibleClubIds = getAccessibleClubIds(auth);
+
+  if (!accessibleClubIds.length) {
+    return [];
+  }
+
+  const affiliations = await Affiliations.find({
+    club: { $in: accessibleClubIds },
+    deletedAt: { $exists: false },
+    status: "approved",
+  })
+    .select("user")
+    .lean();
+
+  return Array.from(
+    new Set(
+      [
+        normalizeTenantId(auth?.userId),
+        ...affiliations.map((affiliation) => normalizeTenantId(affiliation.user)),
+      ].filter(Boolean),
+    ),
+  );
+};
+
+const isUserInTenant = async (auth = {}, targetUserId = "") => {
+  const normalizedTargetUserId = normalizeTenantId(targetUserId);
+
+  if (!normalizedTargetUserId) {
+    return false;
+  }
+
+  if (normalizeTenantId(auth?.userId) === normalizedTargetUserId) {
+    return true;
+  }
+
+  return (await getTenantUserIds(auth)).includes(normalizedTargetUserId);
+};
+
 export const findAll = async (req, res) => {
   try {
-    if (!hasPrivilegedDirectoryAccess(req.auth)) {
+    if (!isTenantSuperAdmin(req.auth) && !hasPrivilegedDirectoryAccess(req.auth)) {
       return res.status(403).json({
         error: "Only owner, secretary, or operator roles can browse all users.",
       });
     }
 
+    const filter = buildUserQuery(req.query);
+
+    if (!isTenantSuperAdmin(req.auth)) {
+      const tenantUserIds = await getTenantUserIds(req.auth);
+      filter._id = { $in: tenantUserIds };
+    }
+
     const result = await listUsers({
-      filter: buildUserQuery(req.query),
+      filter,
       query: req.query,
       select: USER_SELECT,
     });
@@ -254,9 +307,15 @@ export const findAll = async (req, res) => {
 
 export const findOne = async (req, res) => {
   try {
-    if (!canAccessUserRecord(req.auth, req.params.id)) {
-      return res.status(403).json({
-        error: "You can only view your own account unless you manage users.",
+    const isSelfRequest = normalizeTenantId(req.auth?.userId) === normalizeTenantId(req.params.id);
+    const canViewTenantUser =
+      isSelfRequest ||
+      isTenantSuperAdmin(req.auth) ||
+      (hasPrivilegedDirectoryAccess(req.auth) && (await isUserInTenant(req.auth, req.params.id)));
+
+    if (!canViewTenantUser) {
+      return denyTenantAccess(req, res, {
+        reason: "User detail request targeted another club tenant.",
       });
     }
 
@@ -274,18 +333,22 @@ export const findOne = async (req, res) => {
 
 export const createUser = async (req, res) => {
   try {
-    if (!hasPrivilegedDirectoryAccess(req.auth)) {
+    if (!isTenantSuperAdmin(req.auth) && !hasPrivilegedDirectoryAccess(req.auth)) {
       return res.status(403).json({
         error: "Only owner, secretary, or operator roles can create users here.",
       });
     }
 
-    const user = await Users.create(
-      normalizeUserPayload(req.body, {
-        allowAdminFields: true,
-        allowPassword: true,
-      }),
-    );
+    const nextPayload = normalizeUserPayload(req.body, {
+      allowAdminFields: true,
+      allowPassword: true,
+    });
+
+    if (!isTenantSuperAdmin(req.auth)) {
+      nextPayload.clubId = getPrimaryTenantClubId(req.auth);
+    }
+
+    const user = await Users.create(nextPayload);
     const payload = await Users.findById(user._id)
       .select(USER_SELECT)
       .lean({ virtuals: true });
@@ -298,9 +361,15 @@ export const createUser = async (req, res) => {
 
 export const updateUser = async (req, res) => {
   try {
-    if (!canAccessUserRecord(req.auth, req.params.id)) {
-      return res.status(403).json({
-        error: "You can only update your own account unless you manage users.",
+    const isSelfRequest = normalizeTenantId(req.auth?.userId) === normalizeTenantId(req.params.id);
+    const canUpdateTenantUser =
+      isSelfRequest ||
+      isTenantSuperAdmin(req.auth) ||
+      (hasPrivilegedDirectoryAccess(req.auth) && (await isUserInTenant(req.auth, req.params.id)));
+
+    if (!canUpdateTenantUser) {
+      return denyTenantAccess(req, res, {
+        reason: "User update request targeted another club tenant.",
       });
     }
 
@@ -309,7 +378,7 @@ export const updateUser = async (req, res) => {
 
     const allowAdminFields =
       String(req.auth?.userId || "") !== String(req.params.id) &&
-      hasPrivilegedDirectoryAccess(req.auth);
+      (isTenantSuperAdmin(req.auth) || hasPrivilegedDirectoryAccess(req.auth));
 
     user.set(
       normalizeUserPayload(req.body, {
@@ -335,7 +404,7 @@ export const updateUser = async (req, res) => {
 
 export const deleteUser = async (req, res) => {
   try {
-    if (!hasPrivilegedDirectoryAccess(req.auth)) {
+    if (!isTenantSuperAdmin(req.auth) && !hasPrivilegedDirectoryAccess(req.auth)) {
       return res.status(403).json({
         error: "Only owner, secretary, or operator roles can deactivate users.",
       });
@@ -344,6 +413,12 @@ export const deleteUser = async (req, res) => {
     if (String(req.auth?.userId || "") === String(req.params.id)) {
       return res.status(400).json({
         error: "Use sign out instead of deactivating your own account here.",
+      });
+    }
+
+    if (!isTenantSuperAdmin(req.auth) && !(await isUserInTenant(req.auth, req.params.id))) {
+      return denyTenantAccess(req, res, {
+        reason: "User deactivation request targeted another club tenant.",
       });
     }
 

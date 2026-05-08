@@ -218,6 +218,41 @@ export function hasRoleBucket(auth = {}, bucket = "") {
   return normalizedBucket ? roleBuckets.includes(normalizedBucket) : false;
 }
 
+const GLOBAL_TENANT_ADMIN_LABELS = new Set([
+  "admin",
+  "appeals committee",
+  "compliance officer",
+  "federation president",
+  "federation secretary",
+  "regional coordinator",
+  "system administrator",
+]);
+
+const resolveId = (value = "") =>
+  value && typeof value === "object"
+    ? normalizeText(value._id || value.id || value.toString?.() || "")
+    : normalizeText(value);
+
+const getAffiliationClubId = (affiliation = {}) => resolveId(affiliation?.club);
+
+const getAuthUserClubIds = (auth = {}) =>
+  [
+    auth?.user?.clubId,
+    auth?.user?.activePlatform?.club,
+    ...(Array.isArray(auth?.affiliations)
+      ? auth.affiliations.map((affiliation) => affiliation?.club)
+      : []),
+  ]
+    .map(resolveId)
+    .filter(Boolean);
+
+export function hasGlobalTenantAccess(auth = {}) {
+  const roleLabels = Array.isArray(auth.roleLabels) ? auth.roleLabels : [];
+  const labels = [auth?.user?.role, ...roleLabels].map((value) => normalizeRole(value));
+
+  return labels.some((label) => GLOBAL_TENANT_ADMIN_LABELS.has(label));
+}
+
 export function canAccessClubWorkspace(auth = {}, clubId = "") {
   const normalizedClubId = normalizeText(clubId);
 
@@ -225,18 +260,11 @@ export function canAccessClubWorkspace(auth = {}, clubId = "") {
     return false;
   }
 
-  if (hasPermission(auth, "admin:manage") || hasPermission(auth, "club:manage")) {
+  if (hasGlobalTenantAccess(auth)) {
     return true;
   }
 
-  return (Array.isArray(auth.affiliations) ? auth.affiliations : []).some((affiliation) => {
-    const affiliationClub =
-      affiliation?.club && typeof affiliation.club === "object"
-        ? affiliation.club?._id
-        : affiliation?.club;
-
-    return String(affiliationClub || "") === normalizedClubId;
-  });
+  return getAuthUserClubIds(auth).some((candidateClubId) => candidateClubId === normalizedClubId);
 }
 
 export function canManageClubWorkspace(auth = {}, clubId = "") {
@@ -246,15 +274,12 @@ export function canManageClubWorkspace(auth = {}, clubId = "") {
     return false;
   }
 
-  if (hasPermission(auth, "admin:manage") || hasPermission(auth, "club:manage")) {
+  if (hasGlobalTenantAccess(auth)) {
     return true;
   }
 
   return (Array.isArray(auth.affiliations) ? auth.affiliations : []).some((affiliation) => {
-    const affiliationClub =
-      affiliation?.club && typeof affiliation.club === "object"
-        ? affiliation.club?._id
-        : affiliation?.club;
+    const affiliationClub = getAffiliationClubId(affiliation);
     const roleLabels = [
       ...(Array.isArray(affiliation?.roles) ? affiliation.roles : []),
       affiliation?.membershipType,
@@ -265,6 +290,16 @@ export function canManageClubWorkspace(auth = {}, clubId = "") {
       roleLabels.some((bucket) => ["owner", "operator", "secretary"].includes(bucket))
     );
   });
+}
+
+export async function optionalSessionUser(req, res, next) {
+  const token = getTokenFromRequest(req);
+
+  if (!token) {
+    return next();
+  }
+
+  return requireSessionUser(req, res, next);
 }
 
 export async function requireSessionUser(req, res, next) {

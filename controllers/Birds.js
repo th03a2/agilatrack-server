@@ -1,4 +1,8 @@
+import mongoose from "mongoose";
+
+import Affiliations from "../models/Affiliations.js";
 import Birds, {
+  BIRD_HEALTH_STATUSES,
   BIRD_IMAGE_FIELDS,
   BIRD_PHOTO_TYPES,
   buildBirdImageMap,
@@ -10,9 +14,14 @@ import Lofts from "../models/Lofts.js";
 import {
   canAccessClubWorkspace,
   canManageClubWorkspace,
-  hasPermission,
   hasRoleBucket,
 } from "../middleware/sessionAuth.js";
+import {
+  denyTenantAccess,
+  getAccessibleClubIds as getTenantAccessibleClubIds,
+  isTenantSuperAdmin,
+  normalizeTenantId,
+} from "../middleware/tenantIsolation.js";
 import { findDuplicateBandNumber, listPigeons } from "../services/pigeonService.js";
 import { clearCacheByPrefix } from "../utils/cache.js";
 import { v2 as cloudinary } from "cloudinary";
@@ -21,6 +30,7 @@ const sendError = (res, error, status = 400) =>
   res.status(status).json({ error: error.message || error });
 const createStatusError = (message, status = 400) =>
   Object.assign(new Error(message), { status });
+const isValidObjectId = (value = "") => mongoose.Types.ObjectId.isValid(String(value || "").trim());
 
 const encodePathSegment = (value = "") =>
   String(value || "")
@@ -83,6 +93,7 @@ const buildBirdQuery = (query = {}) => {
     bandNumber,
     breeder,
     club,
+    clubId,
     color,
     loft,
     name,
@@ -98,7 +109,7 @@ const buildBirdQuery = (query = {}) => {
   if (affiliation) dbQuery.affiliation = affiliation;
   if (bandNumber) dbQuery.bandNumber = { $regex: bandNumber, $options: "i" };
   if (breeder) dbQuery.breeder = breeder;
-  if (club) dbQuery.club = club;
+  if (club || clubId) dbQuery.club = club || clubId;
   if (color) dbQuery.color = { $regex: color, $options: "i" };
   if (loft) dbQuery.loft = loft;
   if (name) dbQuery.name = { $regex: name, $options: "i" };
@@ -113,19 +124,6 @@ const buildBirdQuery = (query = {}) => {
   return dbQuery;
 };
 
-const getAccessibleClubIds = (auth = {}) =>
-  Array.from(
-    new Set(
-      (Array.isArray(auth.affiliations) ? auth.affiliations : [])
-        .map((affiliation) =>
-          affiliation?.club && typeof affiliation.club === "object"
-            ? String(affiliation.club?._id || "")
-            : String(affiliation?.club || ""),
-        )
-        .filter(Boolean),
-    ),
-  );
-
 const canViewBird = (auth = {}, bird = {}) => {
   const birdClubId =
     bird?.club && typeof bird.club === "object"
@@ -138,9 +136,30 @@ const canViewBird = (auth = {}, bird = {}) => {
 
   return (
     String(auth.userId || "") === ownerId ||
-    hasPermission(auth, "admin:manage") ||
+    isTenantSuperAdmin(auth) ||
     canAccessClubWorkspace(auth, birdClubId)
   );
+};
+
+const getBirdClubId = (bird = {}) =>
+  normalizeTenantId(
+    bird?.clubId && typeof bird.clubId === "object"
+      ? bird.clubId?._id
+      : bird?.clubId || bird?.club,
+  );
+
+const getBirdOwnerId = (bird = {}) =>
+  normalizeTenantId(
+    bird?.ownerId && typeof bird.ownerId === "object"
+      ? bird.ownerId?._id
+      : bird?.ownerId || bird?.owner,
+  );
+
+const canMutateBird = (auth = {}, bird = {}) => {
+  const clubId = getBirdClubId(bird);
+  const ownerId = getBirdOwnerId(bird);
+
+  return canManageClubWorkspace(auth, clubId) || normalizeTenantId(auth?.userId) === ownerId;
 };
 
 const extractBirdImageOverrides = (payload = {}) => {
@@ -355,16 +374,18 @@ const uploadBirdImageToCloudinary = async ({
 export const findAll = async (req, res) => {
   try {
     const dbQuery = buildBirdQuery(req.query);
-    const requestedClubId = String(req.query?.club || "").trim();
+    const requestedClubId = String(req.query?.club || req.query?.clubId || "").trim();
 
     if (requestedClubId) {
       if (!canAccessClubWorkspace(req.auth, requestedClubId)) {
-        return res.status(403).json({
-          error: "You do not have access to this club's pigeon records.",
+        return denyTenantAccess(req, res, {
+          attemptedClubId: requestedClubId,
+          message: "You do not have access to this club's pigeon records.",
+          reason: "Pigeon list requested another club.",
         });
       }
-    } else if (!hasPermission(req.auth, "admin:manage")) {
-      const accessibleClubIds = getAccessibleClubIds(req.auth);
+    } else if (!isTenantSuperAdmin(req.auth)) {
+      const accessibleClubIds = getTenantAccessibleClubIds(req.auth);
 
       if (!accessibleClubIds.length) {
         return res.status(403).json({
@@ -403,8 +424,10 @@ export const findOne = async (req, res) => {
 
     if (!payload) return res.status(404).json({ error: "Bird not found" });
     if (!canViewBird(req.auth, payload)) {
-      return res.status(403).json({
-        error: "You do not have access to this pigeon record.",
+      return denyTenantAccess(req, res, {
+        attemptedClubId: normalizeTenantId(payload.club || payload.clubId),
+        message: "You do not have access to this pigeon record.",
+        reason: "Pigeon detail requested another club.",
       });
     }
 
@@ -459,8 +482,10 @@ export const createBird = async (req, res) => {
     }
 
     if (!canAccessClubWorkspace(req.auth, targetClubId)) {
-      return res.status(403).json({
-        error: "You do not have access to create pigeon records for this club.",
+      return denyTenantAccess(req, res, {
+        attemptedClubId: targetClubId,
+        message: "You do not have access to create pigeon records for this club.",
+        reason: "Pigeon creation attempted outside tenant.",
       });
     }
 
@@ -513,8 +538,10 @@ export const createBird = async (req, res) => {
       ...nextPayloadInput,
       club: targetClubId,
       clubId: targetClubId,
+      createdBy: req.auth?.userId,
       owner: targetOwnerId,
       ownerId: targetOwnerId,
+      updatedBy: req.auth?.userId,
       approvalStatus: "pending",
       approval: {
         ...(req.body?.approval || {}),
@@ -722,6 +749,7 @@ export const updateBird = async (req, res) => {
         clubId,
         owner: currentOwnerId,
         ownerId: currentOwnerId,
+        updatedBy: req.auth?.userId,
         approvalStatus: "pending",
         approval: {
           ...(bird.approval?.toObject?.() || bird.approval || {}),
@@ -751,6 +779,15 @@ export const updateBirdApproval = async (req, res) => {
     const bird = await Birds.findById(req.params.id);
     if (!bird) return res.status(404).json({ error: "Bird not found" });
 
+    const clubId = normalizeTenantId(bird.club || bird.clubId);
+
+    if (!canManageClubWorkspace(req.auth, clubId)) {
+      return denyTenantAccess(req, res, {
+        attemptedClubId: clubId,
+        reason: "Pigeon approval update attempted outside the authenticated user's tenant.",
+      });
+    }
+
     bird.set({
       approvalStatus: req.body?.approvalStatus || "pending",
       approval: {
@@ -771,8 +808,198 @@ export const updateBirdApproval = async (req, res) => {
   }
 };
 
+export const bulkUpdateBirdHealth = async (req, res) => {
+  try {
+    const rawBirdIds = Array.isArray(req.body?.birdIds) ? req.body.birdIds : [];
+    const birdIds = Array.from(
+      new Set(rawBirdIds.map((birdId) => String(birdId || "").trim()).filter(Boolean)),
+    );
+    const healthStatus = String(req.body?.healthStatus || "").trim();
+    const remark = String(req.body?.remarks || req.body?.remark || "").trim();
+
+    if (!birdIds.length) {
+      return res.status(400).json({ error: "Select at least one pigeon for health update." });
+    }
+
+    if (birdIds.some((birdId) => !isValidObjectId(birdId))) {
+      return res.status(400).json({ error: "One or more pigeon ids are invalid." });
+    }
+
+    if (!BIRD_HEALTH_STATUSES.includes(healthStatus)) {
+      return res.status(400).json({
+        error: `Health status must be one of: ${BIRD_HEALTH_STATUSES.join(", ")}.`,
+      });
+    }
+
+    const birds = await Birds.find({
+      _id: { $in: birdIds },
+      deletedAt: { $exists: false },
+    });
+
+    if (birds.length !== birdIds.length) {
+      return res.status(404).json({
+        error: "One or more selected pigeons were not found.",
+      });
+    }
+
+    const unauthorizedBird = birds.find((bird) => !canMutateBird(req.auth, bird));
+
+    if (unauthorizedBird) {
+      return denyTenantAccess(req, res, {
+        attemptedClubId: getBirdClubId(unauthorizedBird),
+        message: "You do not have permission to update one or more selected pigeons.",
+        reason: "Bulk pigeon health update attempted outside ownership or club scope.",
+      });
+    }
+
+    const timestamp = new Date();
+
+    await Promise.all(
+      birds.map((bird) => {
+        bird.healthStatus = healthStatus;
+        bird.updatedBy = req.auth?.userId;
+
+        if (remark) {
+          bird.remarks = [
+            ...(Array.isArray(bird.remarks) ? bird.remarks : []),
+            `Health changed to ${healthStatus}: ${remark}`,
+          ];
+        }
+
+        bird.markModified("remarks");
+        bird.updatedAt = timestamp;
+        return bird.save();
+      }),
+    );
+
+    const payload = await populateBird(
+      Birds.find({ _id: { $in: birdIds } }),
+    ).lean({ virtuals: true });
+    clearCacheByPrefix("dashboard:stats");
+
+    return res.json({
+      success: "Pigeon health updated successfully",
+      payload,
+    });
+  } catch (error) {
+    return sendError(res, error, error?.status || 400);
+  }
+};
+
+export const transferBirdOwnership = async (req, res) => {
+  try {
+    const nextOwnerId = String(
+      req.body?.newOwnerId || req.body?.ownerId || req.body?.userId || "",
+    ).trim();
+    const nextLoftId = String(req.body?.loft || req.body?.loftId || "").trim();
+    const reason = String(req.body?.reason || req.body?.remarks || "").trim();
+
+    if (!nextOwnerId || !isValidObjectId(nextOwnerId)) {
+      return res.status(400).json({ error: "A valid new owner id is required." });
+    }
+
+    if (nextLoftId && !isValidObjectId(nextLoftId)) {
+      return res.status(400).json({ error: "Assigned loft id is invalid." });
+    }
+
+    const bird = await Birds.findById(req.params.id);
+    if (!bird || bird.deletedAt) {
+      return res.status(404).json({ error: "Bird not found" });
+    }
+
+    const clubId = getBirdClubId(bird);
+    const currentOwnerId = getBirdOwnerId(bird);
+    const canManageClub = canManageClubWorkspace(req.auth, clubId);
+    const isCurrentOwner = currentOwnerId === normalizeTenantId(req.auth?.userId);
+
+    if (!canManageClub && !isCurrentOwner) {
+      return res.status(403).json({
+        error: "Only the current owner or club management can transfer this pigeon.",
+      });
+    }
+
+    if (currentOwnerId === normalizeTenantId(nextOwnerId)) {
+      return res.status(400).json({ error: "This pigeon already belongs to the selected owner." });
+    }
+
+    const targetAffiliation = await Affiliations.findOne({
+      club: clubId,
+      deletedAt: { $exists: false },
+      status: "approved",
+      user: nextOwnerId,
+    })
+      .select("_id club user status")
+      .lean();
+
+    if (!targetAffiliation) {
+      return res.status(400).json({
+        error: "The new owner must be an approved member of this club.",
+      });
+    }
+
+    if (nextLoftId) {
+      const loft = await Lofts.findById(nextLoftId).select("club manager deletedAt").lean();
+
+      if (!loft || loft.deletedAt) {
+        return res.status(404).json({ error: "Assigned loft not found." });
+      }
+
+      if (normalizeTenantId(loft.club) !== clubId) {
+        return res.status(400).json({
+          error: "Assigned loft must belong to the same club as the pigeon.",
+        });
+      }
+
+      if (!canManageClub && normalizeTenantId(loft.manager) !== normalizeTenantId(nextOwnerId)) {
+        return res.status(403).json({
+          error: "Only club management can transfer a pigeon into another member's loft.",
+        });
+      }
+    }
+
+    bird.owner = nextOwnerId;
+    bird.ownerId = nextOwnerId;
+    bird.affiliation = targetAffiliation._id;
+    bird.loft = nextLoftId || undefined;
+    bird.updatedBy = req.auth?.userId;
+    bird.remarks = [
+      ...(Array.isArray(bird.remarks) ? bird.remarks : []),
+      `Ownership transferred from ${currentOwnerId || "unknown"} to ${nextOwnerId}${
+        reason ? `: ${reason}` : ""
+      }`,
+    ];
+    bird.markModified("remarks");
+    await bird.save();
+
+    const payload = await populateBird(Birds.findById(bird._id)).lean({
+      virtuals: true,
+    });
+    clearCacheByPrefix("dashboard:stats");
+
+    return res.json({
+      success: "Pigeon ownership transferred successfully",
+      payload,
+    });
+  } catch (error) {
+    return sendError(res, error, error?.status || 400);
+  }
+};
+
 export const deleteBird = async (req, res) => {
   try {
+    const bird = await Birds.findById(req.params.id).select("club clubId").lean();
+
+    if (!bird) return res.status(404).json({ error: "Bird not found" });
+
+    const clubId = normalizeTenantId(bird.club || bird.clubId);
+
+    if (!canManageClubWorkspace(req.auth, clubId)) {
+      return denyTenantAccess(req, res, {
+        attemptedClubId: clubId,
+        reason: "Pigeon archive attempted outside the authenticated user's tenant.",
+      });
+    }
+
     const payload = await populateBird(
       Birds.findByIdAndUpdate(
         req.params.id,

@@ -1,6 +1,9 @@
 import {
   getCurrentUser as getCurrentUserService,
   login as loginService,
+  oauthCallbackPlaceholder as oauthCallbackPlaceholderService,
+  redirectToFacebookOAuth as redirectToFacebookOAuthService,
+  redirectToGoogleOAuth as redirectToGoogleOAuthService,
   register as registerService,
   sendVerificationCode as sendVerificationCodeService,
   update as updateService,
@@ -10,6 +13,16 @@ import {
 } from "../services/authService.js";
 
 export const login = (req, res) => loginService(req, res);
+
+export const redirectToGoogleOAuth = (req, res) => redirectToGoogleOAuthService(req, res);
+
+export const redirectToFacebookOAuth = (req, res) => redirectToFacebookOAuthService(req, res);
+
+export const googleOAuthCallback = (req, res) =>
+  oauthCallbackPlaceholderService("google")(req, res);
+
+export const facebookOAuthCallback = (req, res) =>
+  oauthCallbackPlaceholderService("facebook")(req, res);
 
 export const getCurrentUser = (req, res) => getCurrentUserService(req, res);
 

@@ -2,8 +2,12 @@ import Lofts from "../models/Lofts.js";
 import {
   canAccessClubWorkspace,
   canManageClubWorkspace,
-  hasPermission,
 } from "../middleware/sessionAuth.js";
+import {
+  denyTenantAccess,
+  getAccessibleClubIds as getTenantAccessibleClubIds,
+  isTenantSuperAdmin,
+} from "../middleware/tenantIsolation.js";
 
 const sendError = (res, error, status = 400) =>
   res.status(status).json({ error: error.message || error });
@@ -11,11 +15,13 @@ const sendError = (res, error, status = 400) =>
 const populateLoft = (query) =>
   query
     .populate("club", "name code abbr level location")
-    .populate("manager", "fullName email mobile pid");
+    .populate("manager", "fullName email mobile pid")
+    .populate("ownerId", "fullName email mobile pid");
 
 const buildLoftQuery = (query = {}) => {
   const {
     club,
+    clubId,
     manager,
     code,
     status,
@@ -29,7 +35,7 @@ const buildLoftQuery = (query = {}) => {
   } = query;
   const dbQuery = { deletedAt: { $exists: false } };
 
-  if (club) dbQuery.club = club;
+  if (club || clubId) dbQuery.club = club || clubId;
   if (manager) dbQuery.manager = manager;
   if (code) dbQuery.code = { $regex: code, $options: "i" };
   if (status) dbQuery.status = status;
@@ -44,19 +50,6 @@ const buildLoftQuery = (query = {}) => {
   return dbQuery;
 };
 
-const getAccessibleClubIds = (auth = {}) =>
-  Array.from(
-    new Set(
-      (Array.isArray(auth.affiliations) ? auth.affiliations : [])
-        .map((affiliation) =>
-          affiliation?.club && typeof affiliation.club === "object"
-            ? String(affiliation.club?._id || "")
-            : String(affiliation?.club || ""),
-        )
-        .filter(Boolean),
-    ),
-  );
-
 const canViewLoft = (auth = {}, loft = {}) => {
   const loftClubId =
     loft?.club && typeof loft.club === "object"
@@ -69,7 +62,7 @@ const canViewLoft = (auth = {}, loft = {}) => {
 
   return (
     String(auth.userId || "") === loftManagerId ||
-    hasPermission(auth, "admin:manage") ||
+    isTenantSuperAdmin(auth) ||
     canAccessClubWorkspace(auth, loftClubId)
   );
 };
@@ -77,16 +70,18 @@ const canViewLoft = (auth = {}, loft = {}) => {
 export const findAll = async (req, res) => {
   try {
     const dbQuery = buildLoftQuery(req.query);
-    const requestedClubId = String(req.query?.club || "").trim();
+    const requestedClubId = String(req.query?.club || req.query?.clubId || "").trim();
 
     if (requestedClubId) {
       if (!canAccessClubWorkspace(req.auth, requestedClubId)) {
-        return res.status(403).json({
-          error: "You do not have access to this club's loft records.",
+        return denyTenantAccess(req, res, {
+          attemptedClubId: requestedClubId,
+          message: "You do not have access to this club's loft records.",
+          reason: "Loft list requested another club.",
         });
       }
-    } else if (!hasPermission(req.auth, "admin:manage")) {
-      const accessibleClubIds = getAccessibleClubIds(req.auth);
+    } else if (!isTenantSuperAdmin(req.auth)) {
+      const accessibleClubIds = getTenantAccessibleClubIds(req.auth);
 
       if (!accessibleClubIds.length) {
         return res.status(403).json({
@@ -113,8 +108,11 @@ export const findOne = async (req, res) => {
 
     if (!payload) return res.status(404).json({ error: "Loft not found" });
     if (!canViewLoft(req.auth, payload)) {
-      return res.status(403).json({
-        error: "You do not have access to this loft record.",
+      return denyTenantAccess(req, res, {
+        attemptedClubId:
+          payload?.club && typeof payload.club === "object" ? payload.club?._id : payload?.club,
+        message: "You do not have access to this loft record.",
+        reason: "Loft detail requested another club.",
       });
     }
 
@@ -126,7 +124,7 @@ export const findOne = async (req, res) => {
 
 export const createLoft = async (req, res) => {
   try {
-    const targetClubId = String(req.body?.club || "").trim();
+    const targetClubId = String(req.body?.clubId || req.body?.club || "").trim();
     const requestedManagerId = String(req.body?.manager || req.auth?.userId || "").trim();
 
     if (!targetClubId) {
@@ -134,8 +132,10 @@ export const createLoft = async (req, res) => {
     }
 
     if (!canAccessClubWorkspace(req.auth, targetClubId)) {
-      return res.status(403).json({
-        error: "You do not have access to create loft records for this club.",
+      return denyTenantAccess(req, res, {
+        attemptedClubId: targetClubId,
+        message: "You do not have access to create loft records for this club.",
+        reason: "Loft creation attempted outside tenant.",
       });
     }
 
@@ -148,7 +148,15 @@ export const createLoft = async (req, res) => {
       });
     }
 
-    const created = await Lofts.create(req.body);
+    const created = await Lofts.create({
+      ...req.body,
+      club: targetClubId,
+      clubId: targetClubId,
+      createdBy: req.auth?.userId,
+      manager: requestedManagerId,
+      ownerId: requestedManagerId,
+      updatedBy: req.auth?.userId,
+    });
     const payload = await populateLoft(Lofts.findById(created._id)).lean();
 
     res.status(201).json({ success: "Loft created successfully", payload });
@@ -179,7 +187,14 @@ export const updateLoft = async (req, res) => {
       });
     }
 
-    loft.set(req.body);
+    loft.set({
+      ...req.body,
+      club: clubId,
+      clubId,
+      ownerId: nextManagerId,
+      manager: nextManagerId,
+      updatedBy: req.auth?.userId,
+    });
     await loft.save();
 
     const payload = await populateLoft(Lofts.findById(loft._id)).lean();
@@ -195,16 +210,16 @@ export const deleteLoft = async (req, res) => {
     const loft = await Lofts.findById(req.params.id);
     if (!loft) return res.status(404).json({ error: "Loft not found" });
 
-    if (String(loft.manager || "") === String(req.auth?.userId || "")) {
+    if (
+      String(loft.manager || loft.ownerId || "") === String(req.auth?.userId || "") &&
+      loft.status === "active"
+    ) {
       return res.status(403).json({
-        error: "You cannot archive your own loft record.",
+        error: "You cannot archive your own active loft because it may break your club account and race distance records.",
       });
     }
 
-    if (
-      !hasPermission(req.auth, "admin:manage") &&
-      !canManageClubWorkspace(req.auth, String(loft.club || ""))
-    ) {
+    if (!canManageClubWorkspace(req.auth, String(loft.club || ""))) {
       return res.status(403).json({
         error: "You do not have permission to archive this loft record.",
       });

@@ -8,6 +8,12 @@ import {
   canManageClubWorkspace,
   hasPrivilegedDirectoryAccess,
 } from "../middleware/sessionAuth.js";
+import {
+  denyTenantAccess,
+  getAccessibleClubIds,
+  isTenantSuperAdmin,
+  normalizeTenantId,
+} from "../middleware/tenantIsolation.js";
 import { clearCacheByPrefix } from "../utils/cache.js";
 
 const sendError = (res, error, status = 400) =>
@@ -427,7 +433,7 @@ const canViewAffiliation = (auth = {}, affiliation = {}) => {
 
   return (
     String(auth?.userId || "") === String(affiliationUser || "") ||
-    hasPrivilegedDirectoryAccess(auth) ||
+    isTenantSuperAdmin(auth) ||
     canAccessClubWorkspace(auth, String(affiliationClub || ""))
   );
 };
@@ -440,7 +446,11 @@ export const findAll = async (req, res) => {
     if (requestedClubId && !canAccessClubWorkspace(req.auth, requestedClubId)) {
       dbQuery.user = req.auth.userId;
       delete dbQuery.club;
-    } else if (!hasPrivilegedDirectoryAccess(req.auth) && !requestedClubId) {
+    } else if (!requestedClubId && isTenantSuperAdmin(req.auth)) {
+      // Super admins may keep the global directory view.
+    } else if (!requestedClubId && hasPrivilegedDirectoryAccess(req.auth)) {
+      dbQuery.club = { $in: getAccessibleClubIds(req.auth) };
+    } else if (!requestedClubId) {
       dbQuery.user = req.auth.userId;
     }
 
@@ -452,6 +462,15 @@ export const findAll = async (req, res) => {
   } catch (error) {
     sendError(res, error);
   }
+};
+
+export const findMyApplications = async (req, res) => {
+  req.query = {
+    ...(req.query || {}),
+    user: req.auth?.userId,
+  };
+
+  return findAll(req, res);
 };
 
 export const getClubDashboard = async (req, res) => {
@@ -510,6 +529,16 @@ export const createAffiliation = async (req, res) => {
         error: "You can only create affiliation requests for your own account.",
       });
     }
+    if (
+      !isSelfRequest &&
+      !isTenantSuperAdmin(req.auth) &&
+      !canManageClubWorkspace(req.auth, normalizeTenantId(req.body?.club))
+    ) {
+      return denyTenantAccess(req, res, {
+        attemptedClubId: req.body?.club,
+        reason: "Affiliation creation attempted outside the authenticated user's tenant.",
+      });
+    }
 
     const address = normalizeText(req.body?.application?.address);
     const email = normalizeText(req.body?.application?.email);
@@ -519,8 +548,6 @@ export const createAffiliation = async (req, res) => {
       : [];
     const recommenderName = normalizeText(req.body?.application?.recommenderName);
     const reasonForJoining = normalizeText(req.body?.application?.reasonForJoining);
-    const signatureDate = normalizeText(req.body?.application?.signatureDate);
-    const signatureName = normalizeText(req.body?.application?.signatureName);
 
     if (!fullName) {
       return res.status(400).json({ error: "Full name is required." });
@@ -564,8 +591,6 @@ export const createAffiliation = async (req, res) => {
         photos,
         recommenderName,
         reasonForJoining,
-        signatureDate,
-        signatureName,
       },
       approval: {
         requestedAt: new Date(),
@@ -590,6 +615,16 @@ export const createAffiliation = async (req, res) => {
   } catch (error) {
     sendError(res, error);
   }
+};
+
+export const createClubApplication = async (req, res) => {
+  req.body = {
+    ...(req.body || {}),
+    club: req.params?.clubId || req.body?.club,
+    user: req.body?.user || req.auth?.userId,
+  };
+
+  return createAffiliation(req, res);
 };
 
 export const approveAffiliation = async (req, res) => {
@@ -619,7 +654,7 @@ export const approveAffiliation = async (req, res) => {
     affiliation.approval = {
       ...(affiliation.approval?.toObject?.() || affiliation.approval || {}),
       approvedAt: new Date(),
-      ...(normalizeText(req.body?.actorId) ? { approvedBy: req.body.actorId } : {}),
+      approvedBy: normalizeText(req.body?.actorId) || req.auth?.userId,
       rejectedAt: undefined,
       rejectedBy: undefined,
       reason: "",
@@ -696,7 +731,7 @@ export const rejectAffiliation = async (req, res) => {
     affiliation.approval = {
       ...(affiliation.approval?.toObject?.() || affiliation.approval || {}),
       rejectedAt: new Date(),
-      ...(normalizeText(req.body?.actorId) ? { rejectedBy: req.body.actorId } : {}),
+      rejectedBy: normalizeText(req.body?.actorId) || req.auth?.userId,
       ...(reason ? { reason } : {}),
     };
 

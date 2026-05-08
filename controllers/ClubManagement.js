@@ -1,4 +1,12 @@
 import ClubManagement from "../models/ClubManagement.js";
+import {
+  canAccessTenantClub,
+  canManageTenantClub,
+  denyTenantAccess,
+  getPrimaryTenantClubId,
+  normalizeTenantId,
+  scopeQueryToTenant,
+} from "../middleware/tenantIsolation.js";
 
 const sendError = (res, error, status = 400) =>
   res.status(status).json({ error: error.message || error });
@@ -24,8 +32,18 @@ const buildManagementQuery = (query = {}) => {
 
 export const findAll = async (req, res) => {
   try {
+    const dbQuery = buildManagementQuery(req.query);
+    const allowed = await scopeQueryToTenant(req, res, dbQuery, {
+      field: "club",
+      requestedClubId: req.query?.club || req.query?.clubId,
+    });
+
+    if (!allowed) {
+      return null;
+    }
+
     const payload = await populateManagement(
-      ClubManagement.find(buildManagementQuery(req.query)),
+      ClubManagement.find(dbQuery),
     )
       .sort({ createdAt: -1 })
       .lean();
@@ -46,6 +64,13 @@ export const findOne = async (req, res) => {
       return res.status(404).json({ error: "Club management member not found" });
     }
 
+    if (!canAccessTenantClub(req.auth, normalizeTenantId(payload.club))) {
+      return denyTenantAccess(req, res, {
+        attemptedClubId: normalizeTenantId(payload.club),
+        reason: "Club management record request targeted another club.",
+      });
+    }
+
     res.json({ success: "Club management member fetched successfully", payload });
   } catch (error) {
     sendError(res, error);
@@ -54,7 +79,19 @@ export const findOne = async (req, res) => {
 
 export const createManagementMember = async (req, res) => {
   try {
-    const created = await ClubManagement.create(req.body);
+    const targetClubId = normalizeTenantId(req.body?.club) || getPrimaryTenantClubId(req.auth);
+
+    if (!canManageTenantClub(req.auth, targetClubId)) {
+      return denyTenantAccess(req, res, {
+        attemptedClubId: targetClubId,
+        reason: "Club management creation attempted outside the authenticated user's tenant.",
+      });
+    }
+
+    const created = await ClubManagement.create({
+      ...req.body,
+      club: targetClubId,
+    });
     const payload = await populateManagement(
       ClubManagement.findById(created._id),
     ).lean();
@@ -69,8 +106,27 @@ export const createManagementMember = async (req, res) => {
 
 export const updateManagementMember = async (req, res) => {
   try {
+    const currentRecord = await ClubManagement.findById(req.params.id).select("club").lean();
+
+    if (!currentRecord) {
+      return res.status(404).json({ error: "Club management member not found" });
+    }
+
+    const currentClubId = normalizeTenantId(currentRecord.club);
+    const nextClubId = normalizeTenantId(req.body?.club) || currentClubId;
+
+    if (!canManageTenantClub(req.auth, currentClubId) || !canManageTenantClub(req.auth, nextClubId)) {
+      return denyTenantAccess(req, res, {
+        attemptedClubId: nextClubId || currentClubId,
+        reason: "Club management update attempted outside the authenticated user's tenant.",
+      });
+    }
+
     const payload = await populateManagement(
-      ClubManagement.findByIdAndUpdate(req.params.id, req.body, {
+      ClubManagement.findByIdAndUpdate(req.params.id, {
+        ...req.body,
+        club: currentClubId,
+      }, {
         new: true,
         runValidators: true,
       }),
@@ -88,6 +144,21 @@ export const updateManagementMember = async (req, res) => {
 
 export const deleteManagementMember = async (req, res) => {
   try {
+    const currentRecord = await ClubManagement.findById(req.params.id).select("club").lean();
+
+    if (!currentRecord) {
+      return res.status(404).json({ error: "Club management member not found" });
+    }
+
+    const clubId = normalizeTenantId(currentRecord.club);
+
+    if (!canManageTenantClub(req.auth, clubId)) {
+      return denyTenantAccess(req, res, {
+        attemptedClubId: clubId,
+        reason: "Club management archive attempted outside the authenticated user's tenant.",
+      });
+    }
+
     const payload = await populateManagement(
       ClubManagement.findByIdAndUpdate(
         req.params.id,

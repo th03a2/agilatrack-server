@@ -8,6 +8,15 @@ import Clubs, {
   CLUB_TYPES,
   getClubTypeFromLevel,
 } from "../models/Clubs.js";
+import {
+  canAccessTenantClub,
+  canManageTenantClub,
+  denyTenantAccess,
+  getAccessibleClubIds,
+  isTenantSuperAdmin,
+  normalizeTenantId,
+  scopeQueryToTenant,
+} from "../middleware/tenantIsolation.js";
 import { listClubs } from "../services/clubService.js";
 import { clearCacheByPrefix } from "../utils/cache.js";
 import { v2 as cloudinary } from "cloudinary";
@@ -73,6 +82,19 @@ const sendError = (res, error, status = 400) =>
   res.status(status).json({ error: error.message || error });
 
 const normalizeStatus = (value = "") => String(value || "").trim().toLowerCase();
+
+const isPublicClubDirectoryRequest = (req) =>
+  ["directory", "guest", "public"].includes(
+    normalizeStatus(req.query?.directory || req.query?.scope),
+  );
+
+const shouldScopeAuthenticatedClubDirectory = (req) =>
+  Boolean(
+    req.auth &&
+      !isTenantSuperAdmin(req.auth) &&
+      getAccessibleClubIds(req.auth).length &&
+      !isPublicClubDirectoryRequest(req),
+  );
 
 const normalizeParent = (parent) => {
   if (parent === undefined) return undefined;
@@ -156,6 +178,23 @@ export const findAll = async (req, res) => {
     if (municipalityCode) query["location.municipalityCode"] = municipalityCode;
     if (barangayCode) query["location.barangayCode"] = barangayCode;
 
+    if (shouldScopeAuthenticatedClubDirectory(req)) {
+      const requestedClubId = normalizeTenantId(req.query?.club || req.query?.clubId || req.query?.id);
+
+      if (requestedClubId) {
+        if (!canAccessTenantClub(req.auth, requestedClubId)) {
+          return denyTenantAccess(req, res, {
+            attemptedClubId: requestedClubId,
+            reason: "Authenticated club directory request targeted another club.",
+          });
+        }
+
+        query._id = requestedClubId;
+      } else {
+        query._id = { $in: getAccessibleClubIds(req.auth) };
+      }
+    }
+
     const result = await listClubs({
       filter: query,
       query: req.query,
@@ -193,6 +232,16 @@ export const findLevels = async (req, res) => {
 
 export const findOne = async (req, res) => {
   try {
+    if (
+      shouldScopeAuthenticatedClubDirectory(req) &&
+      !canAccessTenantClub(req.auth, req.params.id)
+    ) {
+      return denyTenantAccess(req, res, {
+        attemptedClubId: req.params.id,
+        reason: "Authenticated club detail request targeted another club.",
+      });
+    }
+
     const payload = await Clubs.findById(req.params.id)
       .populate("parent", "name level location")
       .lean();
@@ -207,6 +256,13 @@ export const findOne = async (req, res) => {
 
 export const createClub = async (req, res) => {
   try {
+    if (!isTenantSuperAdmin(req.auth)) {
+      return denyTenantAccess(req, res, {
+        attemptedClubId: req.body?._id || req.body?.parent,
+        reason: "Only super admins can create new club tenants.",
+      });
+    }
+
     const club = await validateClubHierarchy({
       ...req.body,
       isActive: false,
@@ -222,6 +278,13 @@ export const createClub = async (req, res) => {
 
 export const updateClub = async (req, res) => {
   try {
+    if (!canManageTenantClub(req.auth, req.params.id)) {
+      return denyTenantAccess(req, res, {
+        attemptedClubId: req.params.id,
+        reason: "Club update attempted outside the authenticated user's tenant.",
+      });
+    }
+
     const payload = await Clubs.findById(req.params.id);
     if (!payload) return res.status(404).json({ error: "Club not found" });
 
@@ -250,6 +313,13 @@ export const updateClub = async (req, res) => {
 
 export const deleteClub = async (req, res) => {
   try {
+    if (!canManageTenantClub(req.auth, req.params.id)) {
+      return denyTenantAccess(req, res, {
+        attemptedClubId: req.params.id,
+        reason: "Club archive attempted outside the authenticated user's tenant.",
+      });
+    }
+
     const payload = await Clubs.findByIdAndUpdate(
       req.params.id,
       { deletedAt: new Date().toISOString() },
@@ -278,6 +348,16 @@ const buildClubTree = async (club) => {
 
 export const findChildren = async (req, res) => {
   try {
+    if (
+      shouldScopeAuthenticatedClubDirectory(req) &&
+      !canAccessTenantClub(req.auth, req.params.id)
+    ) {
+      return denyTenantAccess(req, res, {
+        attemptedClubId: req.params.id,
+        reason: "Club children request targeted another club.",
+      });
+    }
+
     const club = await Clubs.findById(req.params.id).lean();
     if (!club) return res.status(404).json({ error: "Club not found" });
 
@@ -296,6 +376,13 @@ export const findChildren = async (req, res) => {
 
 export const uploadClubLogo = async (req, res) => {
   try {
+    if (!canManageTenantClub(req.auth, req.params.id)) {
+      return denyTenantAccess(req, res, {
+        attemptedClubId: req.params.id,
+        reason: "Club logo update attempted outside the authenticated user's tenant.",
+      });
+    }
+
     const cloudinaryReady = refreshCloudinaryConfig();
     if (!cloudinaryReady || !isCloudinaryConfigured()) {
       return res.status(500).json({
@@ -362,6 +449,19 @@ export const uploadClubLogo = async (req, res) => {
 
 export const findPyramid = async (req, res) => {
   try {
+    if (shouldScopeAuthenticatedClubDirectory(req)) {
+      const scopedQuery = { deletedAt: { $exists: false } };
+      const allowed = await scopeQueryToTenant(req, res, scopedQuery, { field: "_id" });
+
+      if (!allowed) {
+        return null;
+      }
+
+      const payload = await Clubs.find(scopedQuery).sort({ name: 1 }).lean();
+
+      return res.json({ success: "Club pyramid fetched successfully", payload });
+    }
+
     const roots = await Clubs.find({
       level: "national",
       deletedAt: { $exists: false },
@@ -378,6 +478,16 @@ export const findPyramid = async (req, res) => {
 
 export const findTree = async (req, res) => {
   try {
+    if (
+      shouldScopeAuthenticatedClubDirectory(req) &&
+      !canAccessTenantClub(req.auth, req.params.id)
+    ) {
+      return denyTenantAccess(req, res, {
+        attemptedClubId: req.params.id,
+        reason: "Club tree request targeted another club.",
+      });
+    }
+
     const club = await Clubs.findById(req.params.id).lean();
     if (!club) return res.status(404).json({ error: "Club not found" });
 

@@ -1,4 +1,9 @@
 import mongoose from "mongoose";
+import {
+  BIRD_RING_NUMBER_PATTERN,
+  isValidBirdRingNumber,
+  normalizeBirdRingNumber,
+} from "../utils/birdRingNumber.js";
 
 const { Schema } = mongoose;
 
@@ -13,10 +18,12 @@ export const BIRD_CATEGORIES = [
   "other",
 ];
 export const BIRD_SPECIES = ["pigeon", "bird", "other"];
+export const BIRD_HEALTH_STATUSES = ["Excellent", "Good", "Fair", "Poor"];
 export const BIRD_STATUSES = [
   "active",
   "breeding",
   "training",
+  "injured",
   "retired",
   "lost",
   "deceased",
@@ -292,10 +299,16 @@ const modelSchema = new Schema(
       uppercase: true,
       trim: true,
       maxlength: 40,
+      set: normalizeBirdRingNumber,
       match: [
-        /^[A-Z0-9][A-Z0-9 ./-]*$/,
+        BIRD_RING_NUMBER_PATTERN,
         "Band number must use uppercase letters, numbers, spaces, dashes, slashes, and dots only.",
       ],
+      validate: {
+        message:
+          "Band number must use uppercase letters, numbers, spaces, dashes, slashes, and dots only.",
+        validator: isValidBirdRingNumber,
+      },
     },
     name: {
       type: String,
@@ -311,7 +324,20 @@ const modelSchema = new Schema(
       type: String,
       trim: true,
     },
+    nationalBirdId: {
+      type: String,
+      trim: true,
+      uppercase: true,
+    },
     strain: {
+      type: String,
+      trim: true,
+    },
+    breed: {
+      type: String,
+      trim: true,
+    },
+    bloodline: {
       type: String,
       trim: true,
     },
@@ -384,6 +410,34 @@ const modelSchema = new Schema(
         trim: true,
       },
     },
+    vaccinationRecords: {
+      type: [Schema.Types.Mixed],
+      default: [],
+    },
+    raceHistory: {
+      type: [Schema.Types.Mixed],
+      default: [],
+    },
+    nfcTagId: {
+      type: String,
+      trim: true,
+      uppercase: true,
+    },
+    rfidTagId: {
+      type: String,
+      trim: true,
+      uppercase: true,
+    },
+    qrCode: {
+      type: String,
+      trim: true,
+      uppercase: true,
+    },
+    healthStatus: {
+      type: String,
+      enum: BIRD_HEALTH_STATUSES,
+      default: "Good",
+    },
     status: {
       type: String,
       enum: BIRD_STATUSES,
@@ -419,6 +473,14 @@ const modelSchema = new Schema(
     photos: {
       type: [photoSchema],
       default: [],
+    },
+    createdBy: {
+      type: Schema.Types.ObjectId,
+      ref: "Users",
+    },
+    updatedBy: {
+      type: Schema.Types.ObjectId,
+      ref: "Users",
     },
     deletedAt: {
       type: String,
@@ -470,6 +532,14 @@ modelSchema.pre("validate", function normalizeBird(next) {
 
   if (!this.hatchYear && this.hatchDate) {
     this.hatchYear = this.hatchDate.getFullYear();
+  }
+
+  if (!this.strain && this.breed) {
+    this.strain = this.breed;
+  }
+
+  if (!this.breed && this.strain) {
+    this.breed = this.strain;
   }
 
   if (this.approvalStatus === "approved" && !this.approval?.approvedAt) {

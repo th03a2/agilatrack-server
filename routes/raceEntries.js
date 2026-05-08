@@ -17,8 +17,8 @@ import { raceEntrySchemas } from "../validations/schemas.js";
 
 const router = express.Router();
 
-router.get("/", findAll);
-router.get("/:id", validateObjectIdParam("id"), findOne);
+router.get("/", requireSessionUser, findAll);
+router.get("/:id", requireSessionUser, validateObjectIdParam("id"), findOne);
 router.post(
   "/",
   requireSessionUser,

@@ -31,7 +31,21 @@ router.put(
   requireAnyPermission("admin:manage", "club:manage", "join_requests:manage"),
   approveAffiliation,
 );
+router.patch(
+  "/:id/approve",
+  requireSessionUser,
+  validateObjectIdParam("id"),
+  requireAnyPermission("admin:manage", "club:manage", "join_requests:manage"),
+  approveAffiliation,
+);
 router.put(
+  "/:id/reject",
+  requireSessionUser,
+  validateObjectIdParam("id"),
+  requireAnyPermission("admin:manage", "club:manage", "join_requests:manage"),
+  rejectAffiliation,
+);
+router.patch(
   "/:id/reject",
   requireSessionUser,
   validateObjectIdParam("id"),

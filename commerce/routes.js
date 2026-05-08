@@ -18,10 +18,67 @@ import {
   transferLoad,
   updateWallet,
 } from "./controllers/commerce.js";
+import {
+  archiveShopProduct,
+  cancelShopOrder,
+  checkoutShopOrder,
+  createShopProduct,
+  findMyShopOrders,
+  findShopAuditLogs,
+  findShopOrders,
+  findShopProducts,
+  fulfillShopOrder,
+  getShopAnalytics,
+  scanFulfillmentQr,
+  updateShopOrderPayment,
+  updateShopProduct,
+} from "./controllers/shop.js";
+import { optionalSessionUser, requireSessionUser } from "../middleware/sessionAuth.js";
+import { validateObjectIdParam } from "../middleware/validateObjectId.js";
 
 const router = express.Router();
 
 router.get("/", getCommerceSummary);
+
+router.get("/shop/products", optionalSessionUser, findShopProducts);
+router.post("/shop/products", requireSessionUser, createShopProduct);
+router.put(
+  "/shop/products/:productId",
+  requireSessionUser,
+  validateObjectIdParam("productId"),
+  updateShopProduct,
+);
+router.delete(
+  "/shop/products/:productId",
+  requireSessionUser,
+  validateObjectIdParam("productId"),
+  archiveShopProduct,
+);
+
+router.get("/shop/orders", requireSessionUser, findShopOrders);
+router.get("/shop/orders/my", requireSessionUser, findMyShopOrders);
+router.post("/shop/orders/checkout", requireSessionUser, checkoutShopOrder);
+router.put(
+  "/shop/orders/:orderId/payment",
+  requireSessionUser,
+  validateObjectIdParam("orderId"),
+  updateShopOrderPayment,
+);
+router.post(
+  "/shop/orders/:orderId/cancel",
+  requireSessionUser,
+  validateObjectIdParam("orderId"),
+  cancelShopOrder,
+);
+router.post(
+  "/shop/orders/:orderId/fulfill",
+  requireSessionUser,
+  validateObjectIdParam("orderId"),
+  fulfillShopOrder,
+);
+router.post("/shop/fulfillment/scan", requireSessionUser, scanFulfillmentQr);
+router.get("/shop/analytics", requireSessionUser, getShopAnalytics);
+router.get("/shop/audit-logs", requireSessionUser, findShopAuditLogs);
 
 router.get("/wallets", findWallets);
 router.get("/wallets/:walletId", findWallet);

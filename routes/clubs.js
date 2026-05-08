@@ -1,4 +1,5 @@
 import express from "express";
+import { createClubApplication } from "../controllers/Affiliations.js";
 import {
   findAll,
   findOne,
@@ -11,19 +12,29 @@ import {
   findTree,
   uploadClubLogo,
 } from "../controllers/Clubs.js";
-import { requireAnyPermission, requireSessionUser } from "../middleware/sessionAuth.js";
+import {
+  optionalSessionUser,
+  requireAnyPermission,
+  requireSessionUser,
+} from "../middleware/sessionAuth.js";
 import { validateObjectIdParam } from "../middleware/validateObjectId.js";
 import { validateRequest } from "../middlewares/validateRequest.js";
 import { clubSchemas } from "../validations/schemas.js";
 
 const router = express.Router();
 
-router.get("/", findAll);
+router.get("/", optionalSessionUser, findAll);
 router.get("/meta/levels", findLevels);
-router.get("/pyramid", findPyramid);
-router.get("/:id/tree", validateObjectIdParam("id"), findTree);
-router.get("/:id/children", validateObjectIdParam("id"), findChildren);
-router.get("/:id", validateObjectIdParam("id"), findOne);
+router.get("/pyramid", optionalSessionUser, findPyramid);
+router.post(
+  "/:clubId/applications",
+  requireSessionUser,
+  validateObjectIdParam("clubId", "club"),
+  createClubApplication,
+);
+router.get("/:id/tree", optionalSessionUser, validateObjectIdParam("id"), findTree);
+router.get("/:id/children", optionalSessionUser, validateObjectIdParam("id"), findChildren);
+router.get("/:id", optionalSessionUser, validateObjectIdParam("id"), findOne);
 router.put(
   "/:id/logo",
   requireSessionUser,

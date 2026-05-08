@@ -23,9 +23,22 @@ const modelSchema = new Schema(
       ref: "Clubs",
       required: true,
     },
+    clubId: {
+      type: Schema.Types.ObjectId,
+      ref: "Clubs",
+    },
+    ownerId: {
+      type: Schema.Types.ObjectId,
+      ref: "Users",
+    },
     manager: {
       type: Schema.Types.ObjectId,
       ref: "Users",
+    },
+    loftType: {
+      type: String,
+      trim: true,
+      default: "home loft",
     },
     device: {
       deviceId: { type: String, trim: true },
@@ -119,12 +132,21 @@ const modelSchema = new Schema(
       zip: { type: String, trim: true },
     },
     capacity: { type: Number, min: 0 },
+    activeBirdCount: { type: Number, min: 0, default: 0 },
     status: {
       type: String,
       enum: ["draft", "active", "inactive", "archived"],
       default: "active",
     },
     notes: { type: String, trim: true },
+    createdBy: {
+      type: Schema.Types.ObjectId,
+      ref: "Users",
+    },
+    updatedBy: {
+      type: Schema.Types.ObjectId,
+      ref: "Users",
+    },
     deletedAt: { type: String },
   },
   {
@@ -133,6 +155,22 @@ const modelSchema = new Schema(
 );
 
 modelSchema.pre("validate", function setGeoPoint(next) {
+  if (!this.clubId && this.club) {
+    this.clubId = this.club;
+  }
+
+  if (!this.club && this.clubId) {
+    this.club = this.clubId;
+  }
+
+  if (!this.ownerId && this.manager) {
+    this.ownerId = this.manager;
+  }
+
+  if (!this.manager && this.ownerId) {
+    this.manager = this.ownerId;
+  }
+
   const latitude = this.coordinates?.latitude;
   const longitude = this.coordinates?.longitude;
 
@@ -149,6 +187,8 @@ modelSchema.pre("validate", function setGeoPoint(next) {
 });
 
 modelSchema.index({ club: 1, deletedAt: 1 });
+modelSchema.index({ clubId: 1, deletedAt: 1 });
+modelSchema.index({ ownerId: 1, status: 1, deletedAt: 1 });
 modelSchema.index({
   "address.regionCode": 1,
   "address.provinceCode": 1,

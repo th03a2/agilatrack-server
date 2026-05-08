@@ -16,6 +16,7 @@ export const COMMERCE_TRANSACTION_TYPES = [
   "load_transfer",
   "bird_registration_fee",
   "race_fee",
+  "shop_purchase",
   "recharge_request",
   "recharge_approval",
   "adjustment",

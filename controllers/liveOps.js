@@ -7,6 +7,12 @@ import RaceEntries from "../models/RaceEntries.js";
 import Races from "../models/Races.js";
 import Users from "../models/Users.js";
 import Wallets from "../models/Wallets.js";
+import {
+  isTenantSuperAdmin,
+  resolveTenantClubId,
+} from "../middleware/tenantIsolation.js";
+import CommerceShopOrders from "../commerce/models/CommerceShopOrders.js";
+import CommerceShopProducts from "../commerce/models/CommerceShopProducts.js";
 
 const paymentTransactionTypes = new Set([
   "preload",
@@ -94,8 +100,15 @@ const buildRaceSummary = (race = {}) => ({
 });
 
 const buildStatusFromConnection = (readyState) => {
+  const baseState = {
+    host: mongoose.connection.host || "",
+    name: mongoose.connection.name || "",
+    readyState,
+  };
+
   if (readyState === 1) {
     return {
+      ...baseState,
       connected: true,
       message: "MongoDB connection is live.",
       status: "connected",
@@ -104,6 +117,7 @@ const buildStatusFromConnection = (readyState) => {
 
   if (readyState === 2) {
     return {
+      ...baseState,
       connected: false,
       message: "MongoDB is still connecting.",
       status: "connecting",
@@ -112,6 +126,7 @@ const buildStatusFromConnection = (readyState) => {
 
   if (readyState === 3) {
     return {
+      ...baseState,
       connected: false,
       message: "MongoDB is disconnecting.",
       status: "disconnecting",
@@ -119,10 +134,28 @@ const buildStatusFromConnection = (readyState) => {
   }
 
   return {
+    ...baseState,
     connected: false,
     message: "MongoDB is disconnected.",
     status: "disconnected",
   };
+};
+
+const filterPayloadByClub = (payload = [], clubId = "") => {
+  const normalizedClubId = normalizeText(clubId);
+
+  if (!normalizedClubId) {
+    return payload;
+  }
+
+  return payload.filter((record) => {
+    const recordClubId =
+      record?.club && typeof record.club === "object"
+        ? normalizeText(record.club.club || record.club._id)
+        : normalizeText(record?.club);
+
+    return recordClubId === normalizedClubId;
+  });
 };
 
 const buildWalletOwner = (wallet = {}) => wallet?.affiliation?.user || wallet?.user || {};
@@ -187,6 +220,11 @@ export const getHealthPayload = () => {
     status: database.connected ? "ok" : "degraded",
     timestamp: new Date().toISOString(),
     uptimeSeconds: Number(process.uptime().toFixed(2)),
+    version:
+      process.env.APP_VERSION ||
+      process.env.RENDER_GIT_COMMIT ||
+      process.env.npm_package_version ||
+      "1.0.0",
   };
 };
 
@@ -201,50 +239,98 @@ export const getHealth = async (req, res) => {
   }
 };
 
+const resolveLiveOpsClubId = (req, res) =>
+  resolveTenantClubId(req, res, {
+    requestedClubId: req.query?.clubId || req.query?.club,
+    requireClub: !isTenantSuperAdmin(req.auth),
+  });
+
+export const buildPaymentsPayload = async ({ clubId = "" } = {}) => {
+  const [wallets, shopOrders] = await Promise.all([
+    populateWalletFeed(
+      Wallets.find({
+        ...(clubId ? { club: clubId } : {}),
+        deletedAt: { $exists: false },
+      }).sort({ updatedAt: -1 }),
+    ),
+    CommerceShopOrders.find({
+      ...(clubId ? { club: clubId } : {}),
+      deletedAt: { $exists: false },
+    })
+      .populate("club", "name code abbr level location")
+      .populate("buyer", "fullName email mobile")
+      .sort({ updatedAt: -1 })
+      .lean(),
+  ]);
+
+  const walletPayments = wallets
+    .flatMap((wallet) => {
+      const owner = buildOwnerSummary(buildWalletOwner(wallet));
+      const club = buildClubSummary(wallet?.affiliation?.club || wallet?.club || {});
+
+      return (wallet.transactions || [])
+        .filter((transaction) => paymentTransactionTypes.has(transaction?.type))
+        .map((transaction) => ({
+          _id: `${wallet._id || "wallet"}:${transaction._id || "transaction"}`,
+          amount: {
+            amount: Number(transaction?.amount || 0),
+            currency: wallet.currency || "PHP",
+          },
+          club,
+          notes: normalizeText(transaction?.description),
+          owner,
+          reference:
+            normalizeText(transaction?.gcashReference) ||
+            normalizeText(transaction?.meta?.reference) ||
+            normalizeText(transaction?.meta?.receiptNumber) ||
+            `PAY-${String(transaction?._id || wallet?._id || "0000").slice(-8).toUpperCase()}`,
+          source: normalizeText(transaction?.type) || "wallet transaction",
+          status:
+            normalizeText(transaction?.status) ||
+            (transaction?.type === "recharge_request" ? "pending" : "completed"),
+          submittedAt: transaction?.transactedAt || wallet.updatedAt || wallet.createdAt,
+          submittedLabel: formatDateTimeLabel(
+            transaction?.transactedAt || wallet.updatedAt || wallet.createdAt,
+          ),
+          verification: transaction?.requiresCall
+            ? "call required"
+            : normalizeText(transaction?.status) || "completed",
+        }));
+    });
+  const shopPayments = shopOrders.map((order) => ({
+    _id: `shop-order-${order._id}`,
+    amount: {
+      amount: Number(order.totalAmount || 0),
+      currency: order.currency || "PHP",
+    },
+    club: buildClubSummary(order.club || {}),
+    notes: `Club shop order ${order.orderNumber}`,
+    owner: buildOwnerSummary(order.buyer || {}),
+    reference: order.paymentReference || order.orderNumber,
+    source: "club shop",
+    status: order.paymentStatus || "pending",
+    submittedAt: order.updatedAt || order.createdAt,
+    submittedLabel: formatDateTimeLabel(order.updatedAt || order.createdAt),
+    verification: order.paymentStatus === "paid" ? "completed" : "pending",
+  }));
+
+  const payload = [...walletPayments, ...shopPayments].sort(
+    (left, right) =>
+      new Date(right.submittedAt || 0).getTime() - new Date(left.submittedAt || 0).getTime(),
+  );
+
+  return filterPayloadByClub(payload, clubId);
+};
+
 export const findPayments = async (req, res) => {
   try {
-    const wallets = await populateWalletFeed(
-      Wallets.find({ deletedAt: { $exists: false } }).sort({ updatedAt: -1 }),
-    );
+    const clubId = await resolveLiveOpsClubId(req, res);
 
-    const payload = wallets
-      .flatMap((wallet) => {
-        const owner = buildOwnerSummary(buildWalletOwner(wallet));
-        const club = buildClubSummary(wallet?.affiliation?.club || wallet?.club || {});
+    if (clubId === null) {
+      return null;
+    }
 
-        return (wallet.transactions || [])
-          .filter((transaction) => paymentTransactionTypes.has(transaction?.type))
-          .map((transaction) => ({
-            _id: `${wallet._id || "wallet"}:${transaction._id || "transaction"}`,
-            amount: {
-              amount: Number(transaction?.amount || 0),
-              currency: wallet.currency || "PHP",
-            },
-            club,
-            notes: normalizeText(transaction?.description),
-            owner,
-            reference:
-              normalizeText(transaction?.gcashReference) ||
-              normalizeText(transaction?.meta?.reference) ||
-              normalizeText(transaction?.meta?.receiptNumber) ||
-              `PAY-${String(transaction?._id || wallet?._id || "0000").slice(-8).toUpperCase()}`,
-            source: normalizeText(transaction?.type) || "wallet transaction",
-            status:
-              normalizeText(transaction?.status) ||
-              (transaction?.type === "recharge_request" ? "pending" : "completed"),
-            submittedAt: transaction?.transactedAt || wallet.updatedAt || wallet.createdAt,
-            submittedLabel: formatDateTimeLabel(
-              transaction?.transactedAt || wallet.updatedAt || wallet.createdAt,
-            ),
-            verification: transaction?.requiresCall
-              ? "call required"
-              : normalizeText(transaction?.status) || "completed",
-          }));
-      })
-      .sort(
-        (left, right) =>
-          new Date(right.submittedAt || 0).getTime() - new Date(left.submittedAt || 0).getTime(),
-      );
+    const payload = await buildPaymentsPayload({ clubId });
 
     res.json({ success: "Payments fetched successfully", payload });
   } catch (error) {
@@ -252,78 +338,99 @@ export const findPayments = async (req, res) => {
   }
 };
 
-export const findPayouts = async (req, res) => {
-  try {
-    const entries = await populateRaceEntryFeed(
-      RaceEntries.find({
+export const buildPayoutsPayload = async ({ clubId = "" } = {}) => {
+  const scopedRaceIds = clubId
+    ? (await Races.find({
+        club: clubId,
         deletedAt: { $exists: false },
-        "result.rank": { $exists: true, $ne: null },
-        "result.status": "qualified",
-      }),
-    );
+      })
+        .select("_id")
+        .lean()).map((race) => race._id)
+    : [];
+  const entries = await populateRaceEntryFeed(
+    RaceEntries.find({
+      deletedAt: { $exists: false },
+      ...(clubId ? { race: { $in: scopedRaceIds } } : {}),
+      "result.rank": { $exists: true, $ne: null },
+      "result.status": "qualified",
+    }),
+  );
 
-    const qualifiedEntryCountByRace = entries.reduce((counts, entry) => {
+  const qualifiedEntryCountByRace = entries.reduce((counts, entry) => {
+    const raceId = String(entry?.race?._id || entry?.race || "");
+
+    if (!raceId) {
+      return counts;
+    }
+
+    counts.set(raceId, (counts.get(raceId) || 0) + 1);
+    return counts;
+  }, new Map());
+
+  const payload = entries
+    .map((entry) => {
       const raceId = String(entry?.race?._id || entry?.race || "");
+      const rank = Number(entry?.result?.rank || 0);
+      const qualifiedEntryCount = qualifiedEntryCountByRace.get(raceId) || 1;
+      const prizePool =
+        Number(entry?.race?.entryFee?.amount || 0) * qualifiedEntryCount;
+      const payoutAmount = Number(
+        ((prizePool || 0) * (payoutShareByRank[rank] || 0)).toFixed(2),
+      );
+      const race = buildRaceSummary(entry?.race || {});
+      const owner = buildOwnerSummary(entry?.affiliation?.user || {});
+      const club = buildClubSummary(entry?.affiliation?.club || entry?.race?.club || {});
 
-      if (!raceId) {
-        return counts;
+      return {
+        _id: entry?._id ? String(entry._id) : `${race.code || "RACE"}-${rank || 0}`,
+        amount: {
+          amount: payoutAmount,
+          currency: entry?.race?.entryFee?.currency || "PHP",
+        },
+        bird: {
+          bandNumber: normalizeText(entry?.bird?.bandNumber),
+          name: normalizeText(entry?.bird?.name),
+        },
+        club,
+        owner,
+        payoutReference:
+          race.code && rank
+            ? `PAYOUT-${race.code}-${String(rank).padStart(2, "0")}`
+            : `PAYOUT-${String(entry?._id || "0000").slice(-8).toUpperCase()}`,
+        payoutStatus:
+          entry?.race?.status === "completed"
+            ? "ready"
+            : entry?.status === "arrived"
+              ? "review"
+              : "pending",
+        race,
+        rank,
+        recordedAt: entry?.arrival?.arrivedAt || entry?.updatedAt || entry?.createdAt,
+      };
+    })
+    .sort((left, right) => {
+      const dateRank =
+        new Date(right.race?.raceDate || 0).getTime() - new Date(left.race?.raceDate || 0).getTime();
+
+      if (dateRank !== 0) {
+        return dateRank;
       }
 
-      counts.set(raceId, (counts.get(raceId) || 0) + 1);
-      return counts;
-    }, new Map());
+      return (left.rank || 999) - (right.rank || 999);
+    });
 
-    const payload = entries
-      .map((entry) => {
-        const raceId = String(entry?.race?._id || entry?.race || "");
-        const rank = Number(entry?.result?.rank || 0);
-        const qualifiedEntryCount = qualifiedEntryCountByRace.get(raceId) || 1;
-        const prizePool =
-          Number(entry?.race?.entryFee?.amount || 0) * qualifiedEntryCount;
-        const payoutAmount = Number(
-          ((prizePool || 0) * (payoutShareByRank[rank] || 0)).toFixed(2),
-        );
-        const race = buildRaceSummary(entry?.race || {});
-        const owner = buildOwnerSummary(entry?.affiliation?.user || {});
-        const club = buildClubSummary(entry?.affiliation?.club || entry?.race?.club || {});
+  return filterPayloadByClub(payload, clubId);
+};
 
-        return {
-          _id: entry?._id ? String(entry._id) : `${race.code || "RACE"}-${rank || 0}`,
-          amount: {
-            amount: payoutAmount,
-            currency: entry?.race?.entryFee?.currency || "PHP",
-          },
-          bird: {
-            bandNumber: normalizeText(entry?.bird?.bandNumber),
-            name: normalizeText(entry?.bird?.name),
-          },
-          club,
-          owner,
-          payoutReference:
-            race.code && rank
-              ? `PAYOUT-${race.code}-${String(rank).padStart(2, "0")}`
-              : `PAYOUT-${String(entry?._id || "0000").slice(-8).toUpperCase()}`,
-          payoutStatus:
-            entry?.race?.status === "completed"
-              ? "ready"
-              : entry?.status === "arrived"
-                ? "review"
-                : "pending",
-          race,
-          rank,
-          recordedAt: entry?.arrival?.arrivedAt || entry?.updatedAt || entry?.createdAt,
-        };
-      })
-      .sort((left, right) => {
-        const dateRank =
-          new Date(right.race?.raceDate || 0).getTime() - new Date(left.race?.raceDate || 0).getTime();
+export const findPayouts = async (req, res) => {
+  try {
+    const clubId = await resolveLiveOpsClubId(req, res);
 
-        if (dateRank !== 0) {
-          return dateRank;
-        }
+    if (clubId === null) {
+      return null;
+    }
 
-        return (left.rank || 999) - (right.rank || 999);
-      });
+    const payload = await buildPayoutsPayload({ clubId });
 
     res.json({ success: "Payouts fetched successfully", payload });
   } catch (error) {
@@ -331,49 +438,90 @@ export const findPayouts = async (req, res) => {
   }
 };
 
+export const buildProductsPayload = async ({ clubId = "" } = {}) => {
+  const [birds, crates, shopProducts] = await Promise.all([
+    populateBirdFeed(
+      Birds.find({
+        ...(clubId ? { club: clubId } : {}),
+        deletedAt: { $exists: false },
+      }).sort({ createdAt: -1 }),
+    ),
+    populateCrateFeed(
+      Crates.find({
+        ...(clubId ? { club: clubId } : {}),
+        deletedAt: { $exists: false },
+      }).sort({ createdAt: -1 }),
+    ),
+    CommerceShopProducts.find({
+      ...(clubId ? { club: clubId } : {}),
+      deletedAt: { $exists: false },
+    })
+      .populate("club", "name code abbr level location")
+      .populate("owner", "fullName email mobile")
+      .sort({ createdAt: -1 })
+      .lean(),
+  ]);
+
+  const crateProducts = crates.map((crate) => ({
+    _id: `crate-${crate._id || crate.code || "registry"}`,
+    category: "crate",
+    club: buildClubSummary(crate?.club || {}),
+    inventoryCount:
+      typeof crate.availableSlots === "number"
+        ? crate.availableSlots
+        : Math.max((crate.capacity || 0) - (crate.occupiedSlots || 0), 0),
+    name: normalizeText(crate?.name) || `${normalizeText(crate?.code) || "Crate"} Unit`,
+    owner: buildOwnerSummary(crate?.handler || {}),
+    reference: normalizeText(crate?.code),
+    source: "crate registry",
+    status: normalizeText(crate?.status) || "active",
+    subtitle: normalizeText(crate?.type) || "standard",
+  }));
+
+  const birdProducts = birds.map((bird) => ({
+    _id: `bird-${bird._id || bird.bandNumber || "registry"}`,
+    category: "pigeon",
+    club: buildClubSummary(bird?.club || {}),
+    inventoryCount: ["sold", "deceased", "archived"].includes(bird?.status) ? 0 : 1,
+    name: normalizeText(bird?.name) || normalizeText(bird?.bandNumber) || "Registered pigeon",
+    owner: buildOwnerSummary(bird?.owner || {}),
+    reference: normalizeText(bird?.bandNumber),
+    source: "pigeon registry",
+    status: normalizeText(bird?.status) || "active",
+    subtitle: normalizeText(bird?.strain) || normalizeText(bird?.species) || "pigeon",
+  }));
+
+  const shopProductRows = shopProducts.map((product) => ({
+    _id: `shop-${product._id}`,
+    category: product.category,
+    club: buildClubSummary(product.club || {}),
+    inventoryCount: Number(product.stockQuantity || 0),
+    name: normalizeText(product.name) || "Club shop product",
+    owner: buildOwnerSummary(product.owner || {}),
+    reference: normalizeText(product.sku) || String(product._id || ""),
+    revenue: Number(product.revenue || 0),
+    salesCount: Number(product.salesCount || 0),
+    source: "club shop",
+    status: normalizeText(product.status) || "active",
+    subtitle: normalizeText(product.productType),
+  }));
+
+  const payload = [...shopProductRows, ...crateProducts, ...birdProducts].sort((left, right) =>
+    String(left.name || "").localeCompare(String(right.name || "")),
+  );
+
+  return filterPayloadByClub(payload, clubId);
+};
+
 export const findProducts = async (req, res) => {
   try {
-    const [birds, crates] = await Promise.all([
-      populateBirdFeed(
-        Birds.find({ deletedAt: { $exists: false } }).sort({ createdAt: -1 }),
-      ),
-      populateCrateFeed(
-        Crates.find({ deletedAt: { $exists: false } }).sort({ createdAt: -1 }),
-      ),
-    ]);
+    const clubId = await resolveLiveOpsClubId(req, res);
 
-    const crateProducts = crates.map((crate) => ({
-      _id: `crate-${crate._id || crate.code || "registry"}`,
-      category: "crate",
-      club: buildClubSummary(crate?.club || {}),
-      inventoryCount:
-        typeof crate.availableSlots === "number"
-          ? crate.availableSlots
-          : Math.max((crate.capacity || 0) - (crate.occupiedSlots || 0), 0),
-      name: normalizeText(crate?.name) || `${normalizeText(crate?.code) || "Crate"} Unit`,
-      owner: buildOwnerSummary(crate?.handler || {}),
-      reference: normalizeText(crate?.code),
-      source: "crate registry",
-      status: normalizeText(crate?.status) || "active",
-      subtitle: normalizeText(crate?.type) || "standard",
-    }));
+    if (clubId === null) {
+      return null;
+    }
 
-    const birdProducts = birds.map((bird) => ({
-      _id: `bird-${bird._id || bird.bandNumber || "registry"}`,
-      category: "pigeon",
-      club: buildClubSummary(bird?.club || {}),
-      inventoryCount: ["sold", "deceased", "archived"].includes(bird?.status) ? 0 : 1,
-      name: normalizeText(bird?.name) || normalizeText(bird?.bandNumber) || "Registered pigeon",
-      owner: buildOwnerSummary(bird?.owner || {}),
-      reference: normalizeText(bird?.bandNumber),
-      source: "pigeon registry",
-      status: normalizeText(bird?.status) || "active",
-      subtitle: normalizeText(bird?.strain) || normalizeText(bird?.species) || "pigeon",
-    }));
-
-    const payload = [...crateProducts, ...birdProducts].sort((left, right) =>
-      String(left.name || "").localeCompare(String(right.name || "")),
-    );
+    const payload = await buildProductsPayload({ clubId });
 
     res.json({ success: "Products fetched successfully", payload });
   } catch (error) {
@@ -381,46 +529,101 @@ export const findProducts = async (req, res) => {
   }
 };
 
+export const buildOrdersPayload = async ({ clubId = "" } = {}) => {
+  const scopedRaceIds = clubId
+    ? (await Races.find({
+        club: clubId,
+        deletedAt: { $exists: false },
+      })
+        .select("_id")
+        .lean()).map((race) => race._id)
+    : [];
+  const [entries, shopOrders] = await Promise.all([
+    populateRaceEntryFeed(
+      RaceEntries.find({
+        deletedAt: { $exists: false },
+        ...(clubId ? { race: { $in: scopedRaceIds } } : {}),
+      }).sort({ createdAt: -1 }),
+    ),
+    CommerceShopOrders.find({
+      ...(clubId ? { club: clubId } : {}),
+      deletedAt: { $exists: false },
+    })
+      .populate("club", "name code abbr level location")
+      .populate("buyer", "fullName email mobile")
+      .sort({ createdAt: -1 })
+      .lean(),
+  ]);
+
+  const raceEntryOrders = entries.map((entry) => {
+    const race = buildRaceSummary(entry?.race || {});
+    const club = buildClubSummary(entry?.affiliation?.club || entry?.race?.club || {});
+
+    return {
+      _id: entry?._id ? String(entry._id) : "",
+      bookedAt: entry?.booking?.bookedAt || entry?.createdAt,
+      club,
+      customer: buildOwnerSummary(entry?.affiliation?.user || {}),
+      item: {
+        bandNumber: normalizeText(entry?.bird?.bandNumber),
+        category: "race entry",
+        name: normalizeText(entry?.bird?.name) || normalizeText(entry?.bird?.bandNumber),
+        quantity: 1,
+        reference: normalizeText(entry?.booking?.bookingCode) || normalizeText(entry?._id),
+      },
+      orderReference:
+        normalizeText(entry?.booking?.bookingCode) ||
+        `ORD-${String(entry?._id || "0000").slice(-8).toUpperCase()}`,
+      race,
+      status:
+        {
+          arrived: "completed",
+          boarded: "packed",
+          booked: "booked",
+          checked_in: "confirmed",
+          departed: "shipped",
+          disqualified: "review",
+          dnf: "completed",
+          no_show: "cancelled",
+          scratched: "cancelled",
+        }[entry?.status] || normalizeText(entry?.status) || "draft",
+    };
+  });
+
+  const shopOrderRows = shopOrders.map((order) => {
+    const firstItem = order.items?.[0] || {};
+
+    return {
+      _id: String(order._id || ""),
+      bookedAt: order.createdAt,
+      club: buildClubSummary(order.club || {}),
+      customer: buildOwnerSummary(order.buyer || {}),
+      item: {
+        bandNumber: "",
+        category: firstItem.category || "club shop",
+        name: firstItem.productName || "Club shop order",
+        quantity: Number(firstItem.quantity || order.items?.length || 1),
+        reference: order.orderNumber,
+      },
+      orderReference: order.orderNumber,
+      race: {},
+      status: order.orderStatus || "pending",
+      totalAmount: Number(order.totalAmount || 0),
+    };
+  });
+
+  return filterPayloadByClub([...shopOrderRows, ...raceEntryOrders], clubId);
+};
+
 export const findOrders = async (req, res) => {
   try {
-    const entries = await populateRaceEntryFeed(
-      RaceEntries.find({ deletedAt: { $exists: false } }).sort({ createdAt: -1 }),
-    );
+    const clubId = await resolveLiveOpsClubId(req, res);
 
-    const payload = entries.map((entry) => {
-      const race = buildRaceSummary(entry?.race || {});
-      const club = buildClubSummary(entry?.affiliation?.club || entry?.race?.club || {});
+    if (clubId === null) {
+      return null;
+    }
 
-      return {
-        _id: entry?._id ? String(entry._id) : "",
-        bookedAt: entry?.booking?.bookedAt || entry?.createdAt,
-        club,
-        customer: buildOwnerSummary(entry?.affiliation?.user || {}),
-        item: {
-          bandNumber: normalizeText(entry?.bird?.bandNumber),
-          category: "race entry",
-          name: normalizeText(entry?.bird?.name) || normalizeText(entry?.bird?.bandNumber),
-          quantity: 1,
-          reference: normalizeText(entry?.booking?.bookingCode) || normalizeText(entry?._id),
-        },
-        orderReference:
-          normalizeText(entry?.booking?.bookingCode) ||
-          `ORD-${String(entry?._id || "0000").slice(-8).toUpperCase()}`,
-        race,
-        status:
-          {
-            arrived: "completed",
-            boarded: "packed",
-            booked: "booked",
-            checked_in: "confirmed",
-            departed: "shipped",
-            disqualified: "review",
-            dnf: "completed",
-            no_show: "cancelled",
-            scratched: "cancelled",
-          }[entry?.status] || normalizeText(entry?.status) || "draft",
-      };
-    });
+    const payload = await buildOrdersPayload({ clubId });
 
     res.json({ success: "Orders fetched successfully", payload });
   } catch (error) {
@@ -430,7 +633,16 @@ export const findOrders = async (req, res) => {
 
 export const findSellers = async (req, res) => {
   try {
-    const clubs = await Clubs.find({ deletedAt: { $exists: false } })
+    const clubId = await resolveLiveOpsClubId(req, res);
+
+    if (clubId === null) {
+      return null;
+    }
+
+    const clubs = await Clubs.find({
+      deletedAt: { $exists: false },
+      ...(clubId ? { _id: clubId } : {}),
+    })
       .sort({ createdAt: -1 })
       .lean();
 
@@ -455,17 +667,28 @@ export const findSellers = async (req, res) => {
 
 export const findShipments = async (req, res) => {
   try {
-    const [races, raceEntries] = await Promise.all([
-      Races.find({ deletedAt: { $exists: false } })
-        .populate("club", "name code abbr level location")
-        .sort({ raceDate: -1, createdAt: -1 })
-        .lean(),
-      RaceEntries.find({ deletedAt: { $exists: false } })
-        .select("race status arrival booking createdAt")
-        .lean(),
-    ]);
+    const clubId = await resolveLiveOpsClubId(req, res);
 
-    const entryStatsByRace = raceEntries.reduce((stats, entry) => {
+    if (clubId === null) {
+      return null;
+    }
+
+    const races = await Races.find({
+      deletedAt: { $exists: false },
+      ...(clubId ? { club: clubId } : {}),
+    })
+      .populate("club", "name code abbr level location")
+      .sort({ raceDate: -1, createdAt: -1 })
+      .lean();
+    const scopedRaceIds = new Set(races.map((race) => String(race._id || "")));
+    const scopedRaceEntries = await RaceEntries.find({
+      deletedAt: { $exists: false },
+      ...(clubId ? { race: { $in: Array.from(scopedRaceIds) } } : {}),
+    })
+      .select("race status arrival booking createdAt")
+      .lean();
+
+    const entryStatsByRace = scopedRaceEntries.reduce((stats, entry) => {
       const raceId = String(entry?.race || "");
 
       if (!raceId) {
@@ -545,6 +768,21 @@ export const findShipments = async (req, res) => {
 
 export const findSupport = async (req, res) => {
   try {
+    const clubId = await resolveLiveOpsClubId(req, res);
+
+    if (clubId === null) {
+      return null;
+    }
+
+    const scopedUserIds = clubId
+      ? (await Affiliations.find({
+          club: clubId,
+          deletedAt: { $exists: false },
+        })
+          .select("user")
+          .lean()).map((affiliation) => affiliation.user)
+      : [];
+
     const [
       pendingAffiliations,
       incompleteClubs,
@@ -553,6 +791,7 @@ export const findSupport = async (req, res) => {
       wallets,
     ] = await Promise.all([
       Affiliations.find({
+        ...(clubId ? { club: clubId } : {}),
         deletedAt: { $exists: false },
         status: "pending",
       })
@@ -561,6 +800,7 @@ export const findSupport = async (req, res) => {
         .sort({ createdAt: -1 })
         .lean(),
       Clubs.find({
+        ...(clubId ? { _id: clubId } : {}),
         deletedAt: { $exists: false },
         $or: [
           { contactPerson: { $exists: false } },
@@ -572,6 +812,7 @@ export const findSupport = async (req, res) => {
         .sort({ createdAt: -1 })
         .lean(),
       Users.find({
+        ...(clubId ? { _id: { $in: scopedUserIds } } : {}),
         isActive: true,
         "profile.status": "pending",
       })
@@ -579,6 +820,7 @@ export const findSupport = async (req, res) => {
         .sort({ createdAt: -1 })
         .lean(),
       Birds.find({
+        ...(clubId ? { club: clubId } : {}),
         deletedAt: { $exists: false },
         approvalStatus: "pending",
       })
@@ -586,7 +828,10 @@ export const findSupport = async (req, res) => {
         .sort({ createdAt: -1 })
         .lean(),
       populateWalletFeed(
-        Wallets.find({ deletedAt: { $exists: false } }).sort({ updatedAt: -1 }),
+        Wallets.find({
+          ...(clubId ? { club: clubId } : {}),
+          deletedAt: { $exists: false },
+        }).sort({ updatedAt: -1 }),
       ),
     ]);
 

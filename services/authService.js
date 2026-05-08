@@ -510,6 +510,107 @@ const sendAuthResponse = async ({ res, userId, token = "", isMobile = false, suc
   });
 };
 
+const getRequestBaseUrl = (req) => {
+  const configuredBaseUrl =
+    normalizeText(process.env.PUBLIC_API_URL) ||
+    normalizeText(process.env.API_PUBLIC_URL) ||
+    normalizeText(process.env.SERVER_URL);
+
+  if (configuredBaseUrl) {
+    return configuredBaseUrl.replace(/\/+$/, "");
+  }
+
+  const host = req.get("host");
+  const protocol = req.get("x-forwarded-proto") || req.protocol || "http";
+
+  return `${protocol}://${host}`;
+};
+
+const getClientBaseUrl = (req) => {
+  const configuredClientUrl =
+    normalizeText(process.env.CLIENT_URL) ||
+    normalizeText(process.env.FRONTEND_URL) ||
+    normalizeText(process.env.WEB_APP_URL);
+
+  if (configuredClientUrl) {
+    return configuredClientUrl.replace(/\/+$/, "");
+  }
+
+  return normalizeText(req.get("origin")) || "http://localhost:5173";
+};
+
+const buildOAuthCallbackUrl = (req, provider) =>
+  `${getRequestBaseUrl(req)}/api/auth/${provider}/callback`;
+
+const redirectToConfiguredOAuthUrl = ({ envKey, res }) => {
+  const configuredUrl = normalizeText(process.env[envKey]);
+
+  if (!configuredUrl) {
+    return false;
+  }
+
+  res.redirect(configuredUrl);
+  return true;
+};
+
+export const redirectToGoogleOAuth = (req, res) => {
+  if (redirectToConfiguredOAuthUrl({ envKey: "GOOGLE_OAUTH_URL", res })) {
+    return;
+  }
+
+  const clientId =
+    normalizeText(process.env.GOOGLE_CLIENT_ID) ||
+    normalizeText(process.env.GOOGLE_OAUTH_CLIENT_ID);
+
+  if (!clientId) {
+    return res.redirect("https://accounts.google.com/");
+  }
+
+  const params = new URLSearchParams({
+    client_id: clientId,
+    prompt: "select_account",
+    redirect_uri: buildOAuthCallbackUrl(req, "google"),
+    response_type: "code",
+    scope: "openid email profile",
+    state: "agilatrack-google",
+  });
+
+  return res.redirect(`https://accounts.google.com/o/oauth2/v2/auth?${params.toString()}`);
+};
+
+export const redirectToFacebookOAuth = (req, res) => {
+  if (redirectToConfiguredOAuthUrl({ envKey: "FACEBOOK_OAUTH_URL", res })) {
+    return;
+  }
+
+  const clientId =
+    normalizeText(process.env.FACEBOOK_CLIENT_ID) ||
+    normalizeText(process.env.FACEBOOK_APP_ID);
+
+  if (!clientId) {
+    return res.redirect("https://www.facebook.com/login/");
+  }
+
+  const params = new URLSearchParams({
+    client_id: clientId,
+    redirect_uri: buildOAuthCallbackUrl(req, "facebook"),
+    response_type: "code",
+    scope: "email,public_profile",
+    state: "agilatrack-facebook",
+  });
+
+  return res.redirect(`https://www.facebook.com/v19.0/dialog/oauth?${params.toString()}`);
+};
+
+export const oauthCallbackPlaceholder = (provider) => (req, res) => {
+  const callbackUrl = new URL(getClientBaseUrl(req));
+
+  callbackUrl.searchParams.set("oauth", provider);
+  callbackUrl.searchParams.set("status", "pending_backend_connection");
+
+  return res.redirect(callbackUrl.toString());
+};
+
 const sendSessionFromRequest = async ({ req, res, success }) => {
   const token = getTokenFromRequest(req);
   if (!token) {

@@ -129,7 +129,6 @@ Birds:
 | PUT | `/nbi/birds/:id` | Update bird |
 | DELETE | `/nbi/birds/:id` | Archive bird |
 | ANY | `/nbi/pigeons/*` | Legacy alias for `/nbi/birds/*` |
-| ANY | `/nbi/pegions/*` | Legacy alias for `/nbi/birds/*` |
 
 Users:
 

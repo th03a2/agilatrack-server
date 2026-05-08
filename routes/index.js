@@ -17,10 +17,49 @@ const sharedRouteGroups = [
     path: "/commerce",
     description: "Dedicated commerce module for wallets, fees, receipts, and recharge approvals",
   },
+  {
+    path: "/commerce/shop/products",
+    description: "Tenant-scoped club shop product catalog with role-based category visibility",
+  },
+  {
+    path: "/commerce/shop/orders",
+    description: "Tenant-scoped club shop order, checkout, payment, and fulfillment workflows",
+  },
+  {
+    path: "/commerce/shop/fulfillment/scan",
+    description: "Validate QR invoices before secretary fulfillment and pickup release",
+  },
+  {
+    path: "/commerce/shop/analytics",
+    description: "Owner and secretary e-commerce revenue, stock, and order analytics",
+  },
   { path: "/clubs", description: "Manage clubs, hierarchy, pyramid, children, and club details" },
+  { path: "/clubs/:clubId/applications", description: "Submit a guest application to join a club" },
+  {
+    path: "/club-applications",
+    description: "Browse club applications with tenant-aware secretary access",
+  },
+  {
+    path: "/club-applications/my",
+    description: "Read the authenticated guest or member's club application status",
+  },
+  { path: "/club-applications/:id/approve", description: "Approve a pending club application" },
+  { path: "/club-applications/:id/reject", description: "Reject a pending club application with a reason" },
   {
     path: "/club-management",
     description: "Manage club owners, secretaries, and club management records",
+  },
+  {
+    path: "/owner-zone/:clubId/verify",
+    description: "Re-authenticate a club owner before opening secure owner finance and store controls",
+  },
+  {
+    path: "/owner-zone/:clubId/snapshot",
+    description: "Fetch owner-only finance and e-commerce data filtered to one owned club",
+  },
+  {
+    path: "/owner-zone/:clubId/audit-logs",
+    description: "Read and record owner-zone audit events for one owned club",
   },
   {
     path: "/crates",
@@ -34,7 +73,6 @@ const sharedRouteGroups = [
   },
   { path: "/avian-health-profiles", description: "Alias for avian health profile management" },
   { path: "/pigeons", description: "Legacy alias for bird profile management" },
-  { path: "/pegions", description: "Legacy typo alias kept for compatibility" },
   { path: "/users", description: "Manage users and user profiles" },
   { path: "/affiliations", description: "Manage user club memberships and racing profiles" },
   {
@@ -50,6 +88,22 @@ const sharedRouteGroups = [
   { path: "/affiliations/:id/assign-role", description: "Assign an initial club role to an affiliation" },
   { path: "/officers", description: "Legacy alias for club management officer records" },
   { path: "/races", description: "Manage race events, booking windows, and departure details" },
+  { path: "/races/:raceId/book", description: "Book eligible pigeons into an open club race" },
+  {
+    path: "/races/:raceId/basketing/scan",
+    description: "Scan or manually basket a booked bird with duplicate prevention",
+  },
+  {
+    path: "/races/:raceId/liberate",
+    description: "Record race liberation details and exact release time",
+  },
+  {
+    path: "/races/:raceId/arrival",
+    description: "Record or scan arrivals, compute velocity, and refresh rankings",
+  },
+  { path: "/races/:raceId/results", description: "Read computed race results and rankings" },
+  { path: "/races/:raceId/results/publish", description: "Publish computed race results" },
+  { path: "/races/:raceId/results/lock", description: "Lock finalized official race results" },
   {
     path: "/race-entries",
     description: "Manage race entry booking, check-in, boarding, departure, arrival, and ranking",

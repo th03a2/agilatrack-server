@@ -1,4 +1,12 @@
 import Crates from "../models/Crates.js";
+import {
+  canAccessTenantClub,
+  canManageTenantClub,
+  denyTenantAccess,
+  getPrimaryTenantClubId,
+  normalizeTenantId,
+  scopeQueryToTenant,
+} from "../middleware/tenantIsolation.js";
 
 const sendError = (res, error, status = 400) =>
   res.status(status).json({ error: error.message || error });
@@ -28,7 +36,17 @@ const buildCrateQuery = (query = {}) => {
 
 export const findAll = async (req, res) => {
   try {
-    const payload = await populateCrate(Crates.find(buildCrateQuery(req.query)))
+    const dbQuery = buildCrateQuery(req.query);
+    const allowed = await scopeQueryToTenant(req, res, dbQuery, {
+      field: "club",
+      requestedClubId: req.query?.club || req.query?.clubId,
+    });
+
+    if (!allowed) {
+      return null;
+    }
+
+    const payload = await populateCrate(Crates.find(dbQuery))
       .sort({ createdAt: -1 })
       .lean({ virtuals: true });
 
@@ -46,6 +64,13 @@ export const findOne = async (req, res) => {
 
     if (!payload) return res.status(404).json({ error: "Crate not found" });
 
+    if (!canAccessTenantClub(req.auth, normalizeTenantId(payload.club))) {
+      return denyTenantAccess(req, res, {
+        attemptedClubId: normalizeTenantId(payload.club),
+        reason: "Crate request targeted another club.",
+      });
+    }
+
     res.json({ success: "Crate fetched successfully", payload });
   } catch (error) {
     sendError(res, error);
@@ -54,7 +79,19 @@ export const findOne = async (req, res) => {
 
 export const createCrate = async (req, res) => {
   try {
-    const created = await Crates.create(req.body);
+    const targetClubId = normalizeTenantId(req.body?.club) || getPrimaryTenantClubId(req.auth);
+
+    if (!canManageTenantClub(req.auth, targetClubId)) {
+      return denyTenantAccess(req, res, {
+        attemptedClubId: targetClubId,
+        reason: "Crate creation attempted outside the authenticated user's tenant.",
+      });
+    }
+
+    const created = await Crates.create({
+      ...req.body,
+      club: targetClubId,
+    });
     const payload = await populateCrate(Crates.findById(created._id)).lean({
       virtuals: true,
     });
@@ -70,7 +107,20 @@ export const updateCrate = async (req, res) => {
     const crate = await Crates.findById(req.params.id);
     if (!crate) return res.status(404).json({ error: "Crate not found" });
 
-    crate.set(req.body);
+    const currentClubId = normalizeTenantId(crate.club);
+    const nextClubId = normalizeTenantId(req.body?.club) || currentClubId;
+
+    if (!canManageTenantClub(req.auth, currentClubId) || !canManageTenantClub(req.auth, nextClubId)) {
+      return denyTenantAccess(req, res, {
+        attemptedClubId: nextClubId || currentClubId,
+        reason: "Crate update attempted outside the authenticated user's tenant.",
+      });
+    }
+
+    crate.set({
+      ...req.body,
+      club: currentClubId,
+    });
     await crate.save();
 
     const payload = await populateCrate(Crates.findById(crate._id)).lean({
@@ -85,6 +135,19 @@ export const updateCrate = async (req, res) => {
 
 export const deleteCrate = async (req, res) => {
   try {
+    const crate = await Crates.findById(req.params.id).select("club").lean();
+
+    if (!crate) return res.status(404).json({ error: "Crate not found" });
+
+    const clubId = normalizeTenantId(crate.club);
+
+    if (!canManageTenantClub(req.auth, clubId)) {
+      return denyTenantAccess(req, res, {
+        attemptedClubId: clubId,
+        reason: "Crate archive attempted outside the authenticated user's tenant.",
+      });
+    }
+
     const payload = await populateCrate(
       Crates.findByIdAndUpdate(
         req.params.id,

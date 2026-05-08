@@ -1,11 +1,28 @@
 import Joi from "joi";
-import { BIRD_CATEGORIES, BIRD_SEXES, BIRD_SPECIES, BIRD_STATUSES } from "../models/Birds.js";
+import {
+  BIRD_CATEGORIES,
+  BIRD_HEALTH_STATUSES,
+  BIRD_SEXES,
+  BIRD_SPECIES,
+  BIRD_STATUSES,
+} from "../models/Birds.js";
 import { CLUB_LEVELS } from "../models/Clubs.js";
 import { RACE_CATEGORIES, RACE_STATUSES } from "../models/Races.js";
+import { BIRD_RING_NUMBER_PATTERN } from "../utils/birdRingNumber.js";
 
 const objectId = Joi.string().hex().length(24);
 const optionalObjectId = objectId.allow("", null);
 const email = Joi.string().trim().lowercase().email({ tlds: { allow: false } });
+const birdRingNumber = Joi.string()
+  .trim()
+  .uppercase()
+  .min(1)
+  .max(40)
+  .pattern(BIRD_RING_NUMBER_PATTERN)
+  .messages({
+    "string.pattern.base":
+      "Band number must use letters, numbers, spaces, dashes, slashes, and dots only.",
+  });
 
 const coordinatesSchema = Joi.object({
   latitude: Joi.number().min(-90).max(90).required(),
@@ -34,12 +51,13 @@ export const authSchemas = {
 
 export const birdSchemas = {
   create: Joi.object({
-    bandNumber: Joi.string().trim().min(1).max(40).required(),
+    bandNumber: birdRingNumber.required(),
     category: Joi.string().valid(...BIRD_CATEGORIES),
     club: objectId,
     clubId: objectId,
     hatchDate: Joi.date().allow("", null),
     hatchYear: Joi.number().integer().min(1900).max(2200),
+    healthStatus: Joi.string().valid(...BIRD_HEALTH_STATUSES),
     loft: optionalObjectId,
     name: Joi.string().trim().min(1).max(80).required(),
     owner: optionalObjectId,
@@ -49,12 +67,13 @@ export const birdSchemas = {
     status: Joi.string().valid(...BIRD_STATUSES),
   }).unknown(true),
   update: Joi.object({
-    bandNumber: Joi.string().trim().min(1).max(40),
+    bandNumber: birdRingNumber,
     category: Joi.string().valid(...BIRD_CATEGORIES),
     club: optionalObjectId,
     clubId: optionalObjectId,
     hatchDate: Joi.date().allow("", null),
     hatchYear: Joi.number().integer().min(1900).max(2200),
+    healthStatus: Joi.string().valid(...BIRD_HEALTH_STATUSES),
     loft: optionalObjectId,
     name: Joi.string().trim().min(1).max(80),
     owner: optionalObjectId,
@@ -128,7 +147,7 @@ export const raceEntrySchemas = {
   book: Joi.object({
     affiliation: objectId.required(),
     bird: Joi.object({
-      bandNumber: Joi.string().trim().min(1).max(40).required(),
+      bandNumber: birdRingNumber.required(),
       name: Joi.string().trim().allow(""),
     }).unknown(true).required(),
     loft: objectId.required(),

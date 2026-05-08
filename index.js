@@ -3,11 +3,11 @@ import dotenv from "dotenv";
 import express from "express";
 import helmet from "helmet";
 import mongoose from "mongoose";
-import morgan from "morgan";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { getHealth } from "./controllers/liveOps.js";
 import { apiNotFoundHandler, errorHandler } from "./middlewares/errorHandler.js";
+import { requestLogger } from "./middleware/requestLogger.js";
 import { sanitizeRequest } from "./middleware/sanitizeRequest.js";
 import AffiliationsRouter from "./routes/affiliations.js";
 import authRouter from "./routes/auth.js";
@@ -16,12 +16,14 @@ import birdsRouter from "./routes/birds.js";
 import chatbotRouter from "./routes/chatbot.js";
 import clubManagementRouter from "./routes/clubManagement.js";
 import clubsRouter from "./routes/clubs.js";
+import clubApplicationsRouter from "./routes/clubApplications.js";
 import commerceRouter from "./commerce/routes.js";
 import cratesRouter from "./routes/crates.js";
 import dashboardRouter from "./routes/dashboard.js";
 import { nbiRoutes, logNbiRoutes } from "./routes/index.js";
 import liveOpsRouter from "./routes/liveOps.js";
 import loftsRouter from "./routes/lofts.js";
+import ownerZoneRouter from "./routes/ownerZone.js";
 import officersRouter from "./routes/officers.js";
 import portalStateRouter from "./routes/portalState.js";
 import raceEntriesRouter from "./routes/raceEntries.js";
@@ -64,7 +66,7 @@ const buildAllowedOrigins = () => {
 const allowedOrigins = buildAllowedOrigins();
 
 const corsOptions = {
-  allowedHeaders: ["Authorization", "Content-Type", "X-Device-Id"],
+  allowedHeaders: ["Authorization", "Content-Type", "X-Device-Id", "X-Owner-Zone-Token"],
   credentials: true,
   methods: ["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"],
   origin(origin, callback) {
@@ -144,11 +146,7 @@ app.use(
   }),
 );
 app.use(cors(corsOptions));
-app.use(
-  morgan("[http] :method :url :status :response-time ms - :res[content-length]", {
-    skip: () => NODE_ENV === "test",
-  }),
-);
+app.use(requestLogger({ skip: () => NODE_ENV === "test" }));
 app.use(express.json({ limit: "15mb" }));
 app.use(express.urlencoded({ extended: true, limit: "15mb" }));
 app.use(sanitizeRequest({ replaceWith: "_" }));
@@ -175,16 +173,17 @@ app.use("/api/auth", authRouter);
 app.use("/nbi/commerce", commerceRouter);
 app.use("/nbi/affiliations", AffiliationsRouter);
 app.use("/nbi/club-management", clubManagementRouter);
+app.use("/nbi/club-applications", clubApplicationsRouter);
 app.use("/nbi/clubs", clubsRouter);
 app.use("/nbi/crates", cratesRouter);
 app.use("/nbi/dashboard", dashboardRouter);
 app.use("/nbi/lofts", loftsRouter);
 app.use("/nbi/officers", officersRouter);
+app.use("/nbi/owner-zone", ownerZoneRouter);
 app.use("/nbi/birds", birdsRouter);
 app.use("/nbi/ahp", avianHealthProfilesRouter);
 app.use("/nbi/avian-health-profiles", avianHealthProfilesRouter);
 app.use("/nbi/pigeons", birdsRouter);
-app.use("/nbi/pegions", birdsRouter);
 app.use("/nbi/upload", uploadsRouter);
 app.use("/nbi/race-entries", raceEntriesRouter);
 app.use("/nbi/races", racesRouter);
@@ -197,16 +196,17 @@ app.use("/nbi", liveOpsRouter);
 app.use("/api/commerce", commerceRouter);
 app.use("/api/affiliations", AffiliationsRouter);
 app.use("/api/club-management", clubManagementRouter);
+app.use("/api/club-applications", clubApplicationsRouter);
 app.use("/api/clubs", clubsRouter);
 app.use("/api/crates", cratesRouter);
 app.use("/api/dashboard", dashboardRouter);
 app.use("/api/lofts", loftsRouter);
 app.use("/api/officers", officersRouter);
+app.use("/api/owner-zone", ownerZoneRouter);
 app.use("/api/birds", birdsRouter);
 app.use("/api/ahp", avianHealthProfilesRouter);
 app.use("/api/avian-health-profiles", avianHealthProfilesRouter);
 app.use("/api/pigeons", birdsRouter);
-app.use("/api/pegions", birdsRouter);
 app.use("/api/upload", uploadsRouter);
 app.use("/api/race-entries", raceEntriesRouter);
 app.use("/api/races", racesRouter);
