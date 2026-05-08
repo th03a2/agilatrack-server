@@ -31,6 +31,7 @@ import racesRouter from "./routes/races.js";
 import uploadsRouter from "./routes/uploads.js";
 import usersRouter from "./routes/users.js";
 import walletsRouter from "./routes/wallets.js";
+import testEmailRouter from "./routes/test-email.js";
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -214,6 +215,7 @@ app.use("/api/users", usersRouter);
 app.use("/api/wallets", walletsRouter);
 app.use("/api/portal-state", portalStateRouter);
 app.use("/api/chatbot", chatbotRouter);
+app.use("/api/test-email", testEmailRouter);
 app.use("/api", liveOpsRouter);
 
 app.get("/health", getHealth);

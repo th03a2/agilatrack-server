@@ -204,7 +204,9 @@ const deliverVerificationCode = async ({ email, code, expiresAt }) => {
   };
 
   try {
-    await transporter.sendMail({
+    console.log(`[email] Sending verification code to: ${email}`);
+    
+    const result = await transporter.sendMail({
       from: smtpConfig.from,
       html: `
         <div style="font-family: Arial, sans-serif; line-height: 1.6; color: #0f172a;">
@@ -227,10 +229,20 @@ const deliverVerificationCode = async ({ email, code, expiresAt }) => {
       to: email,
     });
 
+    console.log(`[email] Verification code sent successfully. Message ID: ${result.messageId}`);
     return { exposedCode: "" };
   } catch (error) {
+    console.error(`[email] Failed to send verification code to ${email}:`, error.message);
+    
+    // Handle specific Gmail errors
+    if (error.code === 'EAUTH') {
+      console.error("[email] Authentication failed. Check Gmail credentials and App Password.");
+    } else if (error.code === 'ECONNECTION') {
+      console.error("[email] Connection failed. Check network and SMTP settings.");
+    }
+    
     if (isProduction()) {
-      throw error;
+      throw new Error(`Email delivery failed: ${error.message}`);
     }
 
     return fallbackToLocalDelivery(error?.message || error);
