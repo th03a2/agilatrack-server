@@ -37,13 +37,6 @@ const isCloudinaryConfigured = () =>
       getCloudinaryConfig().apiKey &&
       getCloudinaryConfig().apiSecret,
   );
-const ALLOWED_LOGO_MIME_TYPES = new Set([
-  "image/jpeg",
-  "image/jpg",
-  "image/png",
-  "image/webp",
-]);
-const MAX_CLUB_LOGO_BYTES = 10 * 1024 * 1024;
 
 const applyCloudinaryConfig = () => {
   const { cloudName, apiKey, apiSecret } = getCloudinaryConfig();
@@ -84,32 +77,6 @@ const getCloudinaryErrorDetails = (error) => {
 };
 
 refreshCloudinaryConfig();
-
-const createStatusError = (message, status = 400) =>
-  Object.assign(new Error(message), { status });
-
-const getBase64SourceMimeType = (source = "") => {
-  const match = String(source || "").match(/^data:(image\/(?:jpeg|jpg|png|webp));base64,/i);
-  return String(match?.[1] || "").toLowerCase();
-};
-
-const getBase64PayloadBytes = (source = "") => {
-  const payload = String(source || "").split(",")[1] || "";
-  const normalizedPayload = payload.replace(/\s/g, "");
-  return Math.floor((normalizedPayload.length * 3) / 4);
-};
-
-const validateClubLogoSource = (source = "") => {
-  const mimeType = getBase64SourceMimeType(source);
-
-  if (!source.startsWith("data:image/") || !ALLOWED_LOGO_MIME_TYPES.has(mimeType)) {
-    throw createStatusError("Only JPG, JPEG, PNG, and WEBP club logos are allowed.");
-  }
-
-  if (getBase64PayloadBytes(source) > MAX_CLUB_LOGO_BYTES) {
-    throw createStatusError("Club logo images must be 10 MB or smaller.");
-  }
-};
 
 const sendError = (res, error, status = 400) =>
   res.status(status).json({ error: error.message || error });
@@ -433,7 +400,12 @@ export const uploadClubLogo = async (req, res) => {
     }
 
     const source = String(req.body?.source || "").trim();
-    validateClubLogoSource(source);
+    if (!source.startsWith("data:image/")) {
+      return res.status(400).json({
+        error: "Invalid image payload",
+        message: "Club logo upload expects a base64 image data URL.",
+      });
+    }
 
     const safeCode = encodePathSegment(club.code || club.abbr || club.name);
     const uploadResult = await cloudinary.uploader.upload(source, {
@@ -468,53 +440,9 @@ export const uploadClubLogo = async (req, res) => {
   } catch (error) {
     const details = getCloudinaryErrorDetails(error);
 
-    return res.status(error?.status || 500).json({
+    return res.status(500).json({
       error: details.message,
       code: details.code,
-    });
-  }
-};
-
-export const removeClubLogo = async (req, res) => {
-  try {
-    if (!canManageTenantClub(req.auth, req.params.id)) {
-      return denyTenantAccess(req, res, {
-        attemptedClubId: req.params.id,
-        reason: "Club logo removal attempted outside the authenticated user's tenant.",
-      });
-    }
-
-    const club = await Clubs.findById(req.params.id).select("_id logo");
-    if (!club) {
-      return res.status(404).json({ error: "Club not found" });
-    }
-
-    const publicId = String(club.logo?.publicId || "").trim();
-
-    if (publicId && refreshCloudinaryConfig() && isCloudinaryConfigured()) {
-      await cloudinary.uploader.destroy(publicId, {
-        invalidate: true,
-        resource_type: "image",
-      });
-    }
-
-    const payload = await Clubs.findByIdAndUpdate(
-      req.params.id,
-      { $unset: { logo: "" } },
-      {
-        new: true,
-        runValidators: false,
-      },
-    );
-    clearCacheByPrefix("clubs:list");
-
-    return res.json({
-      success: "Club logo removed successfully",
-      payload,
-    });
-  } catch (error) {
-    return res.status(error?.status || 500).json({
-      error: error.message || "Club logo removal failed",
     });
   }
 };

@@ -389,9 +389,6 @@ const userSeeds = [
     mobile: "09170000003",
     isMale: true,
     placeKey: "cabanatuan",
-    membershipType: "owner",
-    affiliationRoles: ["owner"],
-    role: "owner",
   },
   {
     key: "ana",
@@ -824,8 +821,6 @@ const raceEntrySeeds = [
 ];
 
 const roleIdByLabel = {
-  "club owner": 11,
-  club_owner: 11,
   fancier: 2,
   guest: 1,
   member: 2,

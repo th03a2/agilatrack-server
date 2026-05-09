@@ -27,7 +27,7 @@ const ENV_PATH = path.join(__dirname, "..", ".env");
 
 const USER_SELECT =
   "_id email username isEmailVerified emailVerifiedAt fullName activePlatform clubId membership membershipStatus profileCompleted role state mobile isMale pid profilePhoto files profile isActive createdAt updatedAt";
-const MOBILE_PORTAL = "club";
+const MOBILE_PORTAL = "guest";
 const VERIFICATION_CODE_LENGTH = 6;
 const VERIFICATION_TTL_MS = 1000 * 60 * 10;
 const VERIFICATION_TTL_MINUTES = VERIFICATION_TTL_MS / (1000 * 60);
@@ -204,9 +204,7 @@ const deliverVerificationCode = async ({ email, code, expiresAt }) => {
   };
 
   try {
-    console.log(`[email] Sending verification code to: ${email}`);
-    
-    const result = await transporter.sendMail({
+    await transporter.sendMail({
       from: smtpConfig.from,
       html: `
         <div style="font-family: Arial, sans-serif; line-height: 1.6; color: #0f172a;">
@@ -229,20 +227,10 @@ const deliverVerificationCode = async ({ email, code, expiresAt }) => {
       to: email,
     });
 
-    console.log(`[email] Verification code sent successfully. Message ID: ${result.messageId}`);
     return { exposedCode: "" };
   } catch (error) {
-    console.error(`[email] Failed to send verification code to ${email}:`, error.message);
-    
-    // Handle specific Gmail errors
-    if (error.code === 'EAUTH') {
-      console.error("[email] Authentication failed. Check Gmail credentials and App Password.");
-    } else if (error.code === 'ECONNECTION') {
-      console.error("[email] Connection failed. Check network and SMTP settings.");
-    }
-    
     if (isProduction()) {
-      throw new Error(`Email delivery failed: ${error.message}`);
+      throw error;
     }
 
     return fallbackToLocalDelivery(error?.message || error);
@@ -384,8 +372,13 @@ const isProfileComplete = (user = {}) => {
 };
 
 const buildAffiliationPlatform = (affiliation, { isMobile }) => {
-  const clubId = affiliation?.club?._id || affiliation?.club;
-  const primaryRole = resolvePrimaryAffiliationRole(affiliation);
+  const clubId =
+    affiliation?.club && typeof affiliation.club === "object"
+      ? affiliation.club?._id
+      : affiliation?.club;
+  const primaryRole = resolvePrimaryAffiliationRole({
+    affiliation,
+  });
 
   return {
     _id: affiliation?._id || null,

@@ -10,7 +10,6 @@ import {
   findLevels,
   findPyramid,
   findTree,
-  removeClubLogo,
   uploadClubLogo,
 } from "../controllers/Clubs.js";
 import {
@@ -40,15 +39,8 @@ router.put(
   "/:id/logo",
   requireSessionUser,
   validateObjectIdParam("id"),
-  requireAnyPermission("admin:manage", "club:manage", "operations:manage"),
+  requireAnyPermission("admin:manage", "club:manage"),
   uploadClubLogo,
-);
-router.delete(
-  "/:id/logo",
-  requireSessionUser,
-  validateObjectIdParam("id"),
-  requireAnyPermission("admin:manage", "club:manage", "operations:manage"),
-  removeClubLogo,
 );
 router.post(
   "/",
