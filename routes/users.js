@@ -5,6 +5,7 @@ import {
   findAll,
   findOne,
   updateUser,
+  validateNickname,
 } from "../controllers/Users.js";
 import { requireSessionUser } from "../middleware/sessionAuth.js";
 
@@ -16,5 +17,6 @@ router.get("/:id", findOne);
 router.post("/", createUser);
 router.put("/:id", updateUser);
 router.delete("/:id", deleteUser);
+router.post("/validate-nickname", validateNickname);
 
 export default router;

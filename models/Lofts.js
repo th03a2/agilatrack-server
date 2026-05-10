@@ -133,6 +133,9 @@ const modelSchema = new Schema(
     },
     capacity: { type: Number, min: 0 },
     activeBirdCount: { type: Number, min: 0, default: 0 },
+    // Logo fields for loft
+    logoUrl: { type: String, trim: true },
+    logoPublicId: { type: String, trim: true },
     status: {
       type: String,
       enum: ["draft", "active", "inactive", "archived"],

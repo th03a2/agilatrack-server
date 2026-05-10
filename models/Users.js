@@ -54,6 +54,9 @@ const userSchema = new Schema(
 
     // corporate portrait photography
     cpid: { type: String },
+    // Logo fields for fancier personal logo
+    logoUrl: { type: String, trim: true },
+    logoPublicId: { type: String, trim: true },
     email: {
       type: String,
       unique: true,
@@ -65,8 +68,14 @@ const userSchema = new Schema(
       unique: true,
       sparse: true,
       trim: true,
-      lowercase: true,
       minlength: 4,
+    },
+    normalizedNickname: {
+      type: String,
+      unique: true,
+      sparse: true,
+      trim: true,
+      lowercase: true,
     },
     isEmailVerified: {
       type: Boolean,

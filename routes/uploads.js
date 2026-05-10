@@ -21,6 +21,32 @@ router.post(
   multipartUploadParser,
   uploadBirdImageAsset,
 );
+
+// Logo upload routes with role protection
+router.post(
+  "/fancier-logo",
+  requireSessionUser,
+  requireAnyRoleBucket("member", "owner", "secretary", "operator", "admin"),
+  multipartUploadParser,
+  uploadAsset,
+);
+
+router.post(
+  "/loft-logo",
+  requireSessionUser,
+  requireAnyRoleBucket("member", "owner", "secretary", "operator", "admin"),
+  multipartUploadParser,
+  uploadAsset,
+);
+
+router.post(
+  "/operator-logo",
+  requireSessionUser,
+  requireAnyRoleBucket("operator", "admin"),
+  multipartUploadParser,
+  uploadAsset,
+);
+
 router.post("/:target", requireSessionUser, multipartUploadParser, uploadAsset);
 
 export default router;

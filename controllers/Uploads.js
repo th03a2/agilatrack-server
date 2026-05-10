@@ -210,6 +210,9 @@ export const uploadAsset = async (req, res) => {
       "club-logo",
       "profile-photo",
       "valid-id",
+      "fancier-logo",
+      "loft-logo",
+      "operator-logo",
     ]);
 
     if (!supportedTargets.has(target)) {
@@ -327,6 +330,215 @@ export const uploadAsset = async (req, res) => {
           user: {
             id: String(user._id || ""),
             validIdImage: uploadResult.secure_url,
+          },
+        }),
+      );
+    }
+
+    // Handle fancier logo upload
+    if (target === "fancier-logo") {
+      const user = await findUploadUser(req, fallbackUserId);
+
+      if (!user || user.isActive === false) {
+        return res.status(401).json({
+          error: "Invalid or expired session",
+          message: "You need to be logged in before updating your logo.",
+        });
+      }
+
+      if (!["member", "owner", "secretary", "operator", "admin"].includes(user.role)) {
+        return res.status(403).json({
+          error: "Access denied",
+          message: "Only fanciers, club owners, secretaries, operators, and admins can upload logos.",
+        });
+      }
+
+      const safeUserKey = encodePathSegment(user.email || user._id);
+      const uploadResult = await uploadImageToCloudinary({
+        folder: `users/${safeUserKey}`,
+        publicId: "logo",
+        source,
+      });
+
+      user.logoUrl = uploadResult.secure_url;
+      user.logoPublicId = uploadResult.public_id;
+      await user.save();
+
+      return res.status(201).json(
+        buildUploadResponse({
+          assetType: "fancier-logo",
+          imageUrl: uploadResult.secure_url,
+          message: "Logo uploaded successfully",
+          payload: {
+            publicId: uploadResult.public_id,
+            source: uploadResult.secure_url,
+          },
+          publicId: uploadResult.public_id,
+          user: {
+            id: String(user._id || ""),
+            logoUrl: uploadResult.secure_url,
+            logoPublicId: uploadResult.public_id,
+          },
+        }),
+      );
+    }
+
+    // Handle loft logo upload
+    if (target === "loft-logo") {
+      const user = await findUploadUser(req, fallbackUserId);
+      const loftId = normalizeText(fields.loftId);
+
+      if (!user || user.isActive === false) {
+        return res.status(401).json({
+          error: "Invalid or expired session",
+          message: "You need to be logged in before updating a loft logo.",
+        });
+      }
+
+      if (!["member", "owner", "secretary", "operator", "admin"].includes(user.role)) {
+        return res.status(403).json({
+          error: "Access denied",
+          message: "Only fanciers, club owners, secretaries, operators, and admins can upload loft logos.",
+        });
+      }
+
+      if (!loftId) {
+        return res.status(400).json({
+          error: "Loft ID is required",
+          message: "Provide loftId to update loft logo.",
+        });
+      }
+
+      const Lofts = (await import("../models/Lofts.js")).default;
+      const loft = await Lofts.findById(loftId);
+
+      if (!loft) {
+        return res.status(404).json({
+          error: "Loft not found",
+          message: "The specified loft does not exist.",
+        });
+      }
+
+      // Check if user owns or manages the loft
+      if (loft.ownerId?.toString() !== user._id.toString() && 
+          loft.manager?.toString() !== user._id.toString() &&
+          user.role !== "admin") {
+        return res.status(403).json({
+          error: "Access denied",
+          message: "You can only upload logos for your own lofts.",
+        });
+      }
+
+      const safeLoftKey = encodePathSegment(loft.code || loft._id);
+      const uploadResult = await uploadImageToCloudinary({
+        folder: `lofts/${safeLoftKey}`,
+        publicId: "logo",
+        source,
+      });
+
+      loft.logoUrl = uploadResult.secure_url;
+      loft.logoPublicId = uploadResult.public_id;
+      await loft.save();
+
+      return res.status(201).json(
+        buildUploadResponse({
+          assetType: "loft-logo",
+          imageUrl: uploadResult.secure_url,
+          message: "Loft logo uploaded successfully",
+          payload: {
+            publicId: uploadResult.public_id,
+            source: uploadResult.secure_url,
+            loftId: loft._id,
+          },
+          publicId: uploadResult.public_id,
+          user: {
+            id: String(user._id || ""),
+            loftId: loft._id,
+            logoUrl: uploadResult.secure_url,
+            logoPublicId: uploadResult.public_id,
+          },
+        }),
+      );
+    }
+
+    // Handle operator logo upload
+    if (target === "operator-logo") {
+      const user = await findUploadUser(req, fallbackUserId);
+      const clubId = normalizeText(fields.clubId);
+
+      if (!user || user.isActive === false) {
+        return res.status(401).json({
+          error: "Invalid or expired session",
+          message: "You need to be logged in before updating an operator logo.",
+        });
+      }
+
+      if (!["operator", "admin"].includes(user.role)) {
+        return res.status(403).json({
+          error: "Access denied",
+          message: "Only operators and admins can upload operator logos.",
+        });
+      }
+
+      if (!clubId) {
+        return res.status(400).json({
+          error: "Club ID is required",
+          message: "Provide clubId to update operator/provincial logo.",
+        });
+      }
+
+      const club = await Clubs.findById(clubId);
+
+      if (!club) {
+        return res.status(404).json({
+          error: "Club not found",
+          message: "The specified club does not exist.",
+        });
+      }
+
+      // Check if user is operator for this club or admin
+      const isOperator = club.management.owner?.user?.toString() === user._id.toString() ||
+                        club.management.secretary?.user?.toString() === user._id.toString() ||
+                        club.members.some(memberId => memberId.toString() === user._id.toString());
+
+      if (!isOperator && user.role !== "admin") {
+        return res.status(403).json({
+          error: "Access denied",
+          message: "You can only upload logos for clubs you operate or manage.",
+        });
+      }
+
+      const safeClubKey = encodePathSegment(club.code || club._id);
+      const uploadResult = await uploadImageToCloudinary({
+        folder: `clubs/${safeClubKey}`,
+        publicId: "logo",
+        source,
+      });
+
+      club.logo = {
+        url: uploadResult.secure_url,
+        publicId: uploadResult.public_id,
+        version: uploadResult.version?.toString() || uploadResult.asset_id,
+        updatedAt: new Date(),
+      };
+      await club.save();
+
+      return res.status(201).json(
+        buildUploadResponse({
+          assetType: "operator-logo",
+          imageUrl: uploadResult.secure_url,
+          message: "Operator logo uploaded successfully",
+          payload: {
+            publicId: uploadResult.public_id,
+            source: uploadResult.secure_url,
+            clubId: club._id,
+          },
+          publicId: uploadResult.public_id,
+          user: {
+            id: String(user._id || ""),
+            clubId: club._id,
+            logoUrl: uploadResult.secure_url,
+            logoPublicId: uploadResult.public_id,
           },
         }),
       );

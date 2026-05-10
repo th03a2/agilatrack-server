@@ -11,6 +11,7 @@ import {
   normalizeTenantId,
 } from "../middleware/tenantIsolation.js";
 import { listUsers } from "../services/userService.js";
+import { validateNickname as validateNicknameUtil, normalizeNickname } from "../utils/nicknameHelper.js";
 
 const USER_SELECT = "-password -__v";
 const EMAIL_PATTERN = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
@@ -82,10 +83,12 @@ const normalizeUserPayload = (
 ) => {
   const nextPayload = {};
   const trimmedEmail = String(payload.email || "").trim().toLowerCase();
-  const trimmedUsername = String(payload.username || "").trim().toLowerCase();
+  const originalUsername = String(payload.username || "").trim();
+  const trimmedUsername = originalUsername.toLowerCase(); // Only for validation
   const trimmedMobile = String(payload.mobile || "").trim();
   const fullName =
     payload.fullName && typeof payload.fullName === "object" ? payload.fullName : null;
+  const nickname = payload.fullName?.nickname;
 
   if (payload.email !== undefined) {
     if (!trimmedEmail) {
@@ -113,7 +116,11 @@ const normalizeUserPayload = (
       );
     }
 
-    nextPayload.username = trimmedUsername;
+    nextPayload.username = originalUsername; // Preserve original capitalization
+    // Add normalizedNickname for uniqueness checking
+    if (originalUsername) {
+      nextPayload.normalizedNickname = normalizeNickname(originalUsername);
+    }
   }
 
   if (payload.mobile !== undefined) {
@@ -143,7 +150,16 @@ const normalizeUserPayload = (
       ...(fname ? { fname } : {}),
       ...(lname ? { lname } : {}),
       ...(mname ? { mname } : {}),
+      ...(nickname !== undefined ? { nickname: nickname.trim() } : {}),
     };
+    
+    // Add normalizedNickname if nickname is provided
+    if (nickname !== undefined) {
+      const trimmedNickname = nickname.trim();
+      if (trimmedNickname) {
+        nextPayload.normalizedNickname = normalizeNickname(trimmedNickname);
+      }
+    }
   }
 
   if (payload.isMale !== undefined) {
@@ -433,6 +449,38 @@ export const deleteUser = async (req, res) => {
     if (!payload) return res.status(404).json({ error: "User not found" });
 
     res.json({ success: "User deactivated successfully", payload: serializeUser(payload) });
+  } catch (error) {
+    sendError(res, error);
+  }
+};
+
+export const validateNickname = async (req, res) => {
+  try {
+    const { nickname, userId } = req.body;
+    
+    if (!nickname) {
+      return res.status(400).json({
+        success: false,
+        message: "Nickname is required.",
+        suggestions: []
+      });
+    }
+    
+    const validation = await validateNicknameUtil(nickname.trim(), userId);
+    
+    if (validation.isValid) {
+      return res.json({
+        success: true,
+        message: "Nickname is available.",
+        suggestions: []
+      });
+    } else {
+      return res.status(400).json({
+        success: false,
+        message: validation.error,
+        suggestions: validation.suggestions
+      });
+    }
   } catch (error) {
     sendError(res, error);
   }
