@@ -375,6 +375,13 @@ export const findAll = async (req, res) => {
   try {
     const dbQuery = buildBirdQuery(req.query);
     const requestedClubId = String(req.query?.club || req.query?.clubId || "").trim();
+    const myBirdsOnly = req.query?.myBirdsOnly === "true";
+    const isMyBirdsRoute = req.path.includes("/my-birds");
+
+    // Filter by current user's ownership if requested or using /my-birds route
+    if ((myBirdsOnly || isMyBirdsRoute) && req.auth?.userId) {
+      dbQuery.$or = [{ ownerId: req.auth.userId }, { owner: req.auth.userId }];
+    }
 
     if (requestedClubId) {
       if (!canAccessClubWorkspace(req.auth, requestedClubId)) {
@@ -441,51 +448,41 @@ export const createBird = async (req, res) => {
   try {
     const { imageMap, payloadInput: nextPayloadInput } = buildBirdPayloadInput(req.body);
     const missingImages = getMissingRequiredBirdImages(imageMap);
-    const fallbackClubId =
-      Array.isArray(req.auth?.affiliations) && req.auth.affiliations.length === 1
-        ? String(
-            req.auth.affiliations[0]?.club && typeof req.auth.affiliations[0].club === "object"
-              ? req.auth.affiliations[0].club?._id || ""
-              : req.auth.affiliations[0]?.club || "",
-          )
-        : "";
-    const targetClubId = String(nextPayloadInput?.clubId || nextPayloadInput?.club || fallbackClubId).trim();
-    const requestedOwnerId = String(nextPayloadInput?.ownerId || nextPayloadInput?.owner || "").trim();
-    const targetOwnerId =
-      requestedOwnerId && canManageClubWorkspace(req.auth, targetClubId)
-        ? requestedOwnerId
-        : String(req.auth?.userId || "").trim();
-    const targetLoftId = String(nextPayloadInput?.loft || "").trim();
 
-    if (!hasRoleBucket(req.auth, "member") && !canManageClubWorkspace(req.auth, targetClubId)) {
+    // Find user's active approved membership
+    const approvedAffiliation = req.auth?.affiliations?.find(
+      aff => aff.status === "approved" && !aff.deletedAt && aff.club
+    );
+
+    if (!approvedAffiliation) {
       return res.status(403).json({
-        error: "Only members, owners, or secretaries can add pigeon records.",
+        error: "You need an approved club membership before registering a bird.",
       });
     }
+
+    // Enforce owner and club from authenticated user's approved membership
+    const targetOwnerId = String(req.auth?.userId || "").trim();
+    const targetClubId = String(
+      typeof approvedAffiliation.club === "object" 
+        ? approvedAffiliation.club._id || approvedAffiliation.club
+        : approvedAffiliation.club
+    ).trim();
+    const targetAffiliationId = String(approvedAffiliation._id || "").trim();
+    const targetLoftId = String(nextPayloadInput?.loft || "").trim();
 
     if (!targetOwnerId) {
       return res.status(401).json({ error: "You must be logged in to add pigeon records." });
     }
 
-    if (
-      requestedOwnerId &&
-      requestedOwnerId !== String(req.auth?.userId || "") &&
-      requestedOwnerId !== targetOwnerId
-    ) {
+    if (!targetClubId) {
       return res.status(403).json({
-        error: "Only owners or secretaries can assign a pigeon to another member.",
+        error: "Your approved membership must be associated with a valid club.",
       });
     }
 
-    if (!targetClubId) {
-      return res.status(400).json({ error: "Club is required." });
-    }
-
-    if (!canAccessClubWorkspace(req.auth, targetClubId)) {
-      return denyTenantAccess(req, res, {
-        attemptedClubId: targetClubId,
-        message: "You do not have access to create pigeon records for this club.",
-        reason: "Pigeon creation attempted outside tenant.",
+    if (!hasRoleBucket(req.auth, "member") && !canManageClubWorkspace(req.auth, targetClubId)) {
+      return res.status(403).json({
+        error: "Only members, owners, or secretaries can add pigeon records.",
       });
     }
 
@@ -536,8 +533,10 @@ export const createBird = async (req, res) => {
 
     const payloadInput = {
       ...nextPayloadInput,
+      // Override any frontend-provided owner/club with authenticated user's data
       club: targetClubId,
       clubId: targetClubId,
+      affiliation: targetAffiliationId,
       createdBy: req.auth?.userId,
       owner: targetOwnerId,
       ownerId: targetOwnerId,

@@ -140,11 +140,14 @@ const extractPermissions = ({ roleBuckets = [], roleLabels = [] } = {}) => {
   }
 
   if (roleBuckets.includes("operator")) {
-    permissions.add("club:access");
     permissions.add("communications:read");
     permissions.add("crates:manage");
     permissions.add("operations:manage");
-    permissions.add("races:manage");
+    permissions.add("races:read");
+    permissions.add("races:basketing");
+    permissions.add("races:liberation");
+    permissions.add("races:arrival_scan");
+    permissions.add("races:timing");
   }
 
   if (

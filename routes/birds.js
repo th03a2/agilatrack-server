@@ -48,6 +48,7 @@ router.patch(
   requireAnyPermission("club:manage", "operations:manage", "records:self"),
   transferBirdOwnership,
 );
+router.get("/my-birds", requireSessionUser, findAll);
 router.get("/:id", requireSessionUser, validateObjectIdParam("id"), findOne);
 router.post(
   "/",

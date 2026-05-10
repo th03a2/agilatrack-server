@@ -34,21 +34,21 @@ router.post(
   "/:raceId/basketing/scan",
   requireSessionUser,
   validateObjectIdParam("raceId", "race"),
-  requireAnyPermission("club:manage", "operations:manage", "races:manage"),
+  requireAnyPermission("club:manage", "operations:manage", "races:basketing"),
   scanBasketing,
 );
 router.post(
   "/:raceId/liberate",
   requireSessionUser,
   validateObjectIdParam("raceId", "race"),
-  requireAnyPermission("club:manage", "operations:manage", "races:manage"),
+  requireAnyPermission("club:manage", "operations:manage", "races:liberation"),
   liberateRace,
 );
 router.post(
   "/:raceId/arrival",
   requireSessionUser,
   validateObjectIdParam("raceId", "race"),
-  requireAnyPermission("club:manage", "operations:manage", "races:manage"),
+  requireAnyPermission("club:manage", "operations:manage", "races:arrival_scan"),
   recordRaceArrivalByRace,
 );
 router.get(
