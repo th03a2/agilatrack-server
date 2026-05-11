@@ -61,7 +61,7 @@ const buildAllowedOrigins = () => {
     "http://localhost:5173",
     "http://127.0.0.1:4173",
     "http://127.0.0.1:5173",
-    "https://agila-track.technowiz.work/",
+    "https://agila-track.technowiz.work",
   ];
 
   return Array.from(new Set([...configuredOrigins, ...defaultOrigins]));
