@@ -1,1 +1,0 @@
-import{n as e}from"./api-DqSs6I1K.js";async function t(t,n,r={}){let i=new FormData;return i.append(`image`,t),r.userId&&i.append(`userId`,r.userId),e(`/api/upload/${n}`,{method:`POST`,body:i})}export{t};
