@@ -164,6 +164,9 @@ app.use(
     crossOriginResourcePolicy: false,
   }),
 );
+
+app.use(express.static(path.join(__dirname, "view")));
+
 app.use(cors(corsOptions));
 app.use(requestLogger({ skip: () => NODE_ENV === "test" }));
 app.use(express.json({ limit: "15mb" }));
@@ -250,8 +253,6 @@ app.get("/api/routes", (req, res) => {
     success: "Legacy API routes fetched successfully",
   });
 });
-
-app.use(express.static(path.join(__dirname, "view")));
 
 app.get(/^(?!\/(?:api|nbi)(?:\/|$)).*/, (_, res) => {
   res.sendFile(path.join(__dirname, "view", "index.html"));
