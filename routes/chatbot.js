@@ -1,10 +1,15 @@
 import express from "express";
 import { getSuggestions, queryChatbot } from "../controllers/Chatbot.js";
+import { requireSessionUser } from "../middleware/sessionAuth.js";
 
 const router = express.Router();
 
+// Public endpoints for onboarding assistant
 router.get("/suggestions", getSuggestions);
 router.post("/query", queryChatbot);
+
+// Protected endpoints
+router.use(requireSessionUser);
 
 // New endpoints for smart chatbot
 router.get("/stats", async (req, res) => {

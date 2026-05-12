@@ -11,6 +11,7 @@ import {
   findPyramid,
   findTree,
   uploadClubLogo,
+  findPublicClubs,
 } from "../controllers/Clubs.js";
 import {
   optionalSessionUser,
@@ -23,6 +24,10 @@ import { clubSchemas } from "../validations/schemas.js";
 
 const router = express.Router();
 
+// Public endpoint for landing page stats (no auth required)
+router.get("/public", findPublicClubs);
+
+// Other endpoints
 router.get("/", optionalSessionUser, findAll);
 router.get("/meta/levels", findLevels);
 router.get("/pyramid", optionalSessionUser, findPyramid);

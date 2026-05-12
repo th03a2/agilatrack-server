@@ -9,6 +9,7 @@ import {
   uploadBirdPhoto,
   updateBirdApproval,
   updateBird,
+  findPublicBirds,
 } from "../controllers/Birds.js";
 import {
   requireAnyPermission,
@@ -21,6 +22,10 @@ import { birdSchemas } from "../validations/schemas.js";
 
 const router = express.Router();
 
+// Public endpoint for landing page stats (no auth required)
+router.get("/public", findPublicBirds);
+
+// Protected endpoints
 router.get("/", requireSessionUser, findAll);
 router.patch(
   "/bulk-health",
@@ -53,7 +58,7 @@ router.get("/:id", requireSessionUser, validateObjectIdParam("id"), findOne);
 router.post(
   "/",
   requireSessionUser,
-  requireAnyRoleBucket("member", "owner", "secretary"),
+  requireAnyRoleBucket("guest", "member", "owner", "secretary"),
   validateRequest(birdSchemas.create),
   createBird,
 );
@@ -69,7 +74,7 @@ router.delete(
   "/:id",
   requireSessionUser,
   validateObjectIdParam("id"),
-  requireAnyPermission("admin:manage", "club:manage", "operations:manage"),
+  requireAnyPermission("admin:manage", "club:manage", "operations:manage", "records:self"),
   deleteBird,
 );
 

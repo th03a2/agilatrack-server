@@ -195,3 +195,20 @@ export const deleteRace = async (req, res) => {
     sendError(res, error);
   }
 };
+
+// Public endpoint for landing page stats
+export const findPublicRaces = async (req, res) => {
+  try {
+    const publicRaces = await Races.find({ 
+      deletedAt: { $exists: false },
+      status: { $in: ["open", "booking_open", "completed"] }
+    })
+    .select("code name startDate endDate status category type")
+    .lean()
+    .limit(100); // Limit for performance and security
+
+    res.json({ success: "Public races fetched successfully", payload: publicRaces });
+  } catch (error) {
+    sendError(res, error);
+  }
+};

@@ -6,11 +6,16 @@ import {
   findOne,
   updateUser,
   validateNickname,
+  findPublicUsers,
 } from "../controllers/Users.js";
 import { requireSessionUser } from "../middleware/sessionAuth.js";
 
 const router = express.Router();
 
+// Public endpoint for landing page stats (no auth required)
+router.get("/public", findPublicUsers);
+
+// Protected endpoints
 router.use(requireSessionUser);
 router.get("/", findAll);
 router.get("/:id", findOne);

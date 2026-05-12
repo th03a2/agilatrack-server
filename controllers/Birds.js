@@ -134,8 +134,12 @@ const canViewBird = (auth = {}, bird = {}) => {
       ? String(bird.ownerId?._id || "")
       : String(bird?.ownerId || bird?.owner?._id || bird?.owner || "");
 
+  // Guests can view their own pigeons even without club affiliation
+  const isOwner = String(auth.userId || "") === ownerId;
+  const isGuest = hasRoleBucket(auth, "guest");
+
   return (
-    String(auth.userId || "") === ownerId ||
+    isOwner ||
     isTenantSuperAdmin(auth) ||
     canAccessClubWorkspace(auth, birdClubId)
   );
@@ -158,8 +162,11 @@ const getBirdOwnerId = (bird = {}) =>
 const canMutateBird = (auth = {}, bird = {}) => {
   const clubId = getBirdClubId(bird);
   const ownerId = getBirdOwnerId(bird);
+  const isOwner = normalizeTenantId(auth?.userId) === ownerId;
+  const isGuest = hasRoleBucket(auth, "guest");
 
-  return canManageClubWorkspace(auth, clubId) || normalizeTenantId(auth?.userId) === ownerId;
+  // Guests can mutate their own pigeons, others need club management access
+  return isOwner || canManageClubWorkspace(auth, clubId);
 };
 
 const extractBirdImageOverrides = (payload = {}) => {
@@ -378,6 +385,9 @@ export const findAll = async (req, res) => {
     const myBirdsOnly = req.query?.myBirdsOnly === "true";
     const isMyBirdsRoute = req.path.includes("/my-birds");
 
+    // Check if user is Guest (no approved affiliations)
+    const isGuest = hasRoleBucket(req.auth, "guest") && !getTenantAccessibleClubIds(req.auth).length;
+
     // Filter by current user's ownership if requested or using /my-birds route
     if ((myBirdsOnly || isMyBirdsRoute) && req.auth?.userId) {
       dbQuery.$or = [{ ownerId: req.auth.userId }, { owner: req.auth.userId }];
@@ -391,6 +401,12 @@ export const findAll = async (req, res) => {
           reason: "Pigeon list requested another club.",
         });
       }
+    } else if (isGuest) {
+      // Guests can only see their own pigeons (both club-affiliated and personal)
+      if (!req.auth?.userId) {
+        return res.status(401).json({ error: "You must be logged in to view pigeon records." });
+      }
+      dbQuery.$or = [{ ownerId: req.auth.userId }, { owner: req.auth.userId }];
     } else if (!isTenantSuperAdmin(req.auth)) {
       const accessibleClubIds = getTenantAccessibleClubIds(req.auth);
 
@@ -454,36 +470,59 @@ export const createBird = async (req, res) => {
       aff => aff.status === "approved" && !aff.deletedAt && aff.club
     );
 
-    if (!approvedAffiliation) {
-      return res.status(403).json({
-        error: "You need an approved club membership before registering a bird.",
-      });
-    }
-
-    // Enforce owner and club from authenticated user's approved membership
+    // Check if user is Guest (no approved affiliations)
+    const isGuest = !approvedAffiliation;
+    
+    // Enforce owner from authenticated user
     const targetOwnerId = String(req.auth?.userId || "").trim();
-    const targetClubId = String(
-      typeof approvedAffiliation.club === "object" 
-        ? approvedAffiliation.club._id || approvedAffiliation.club
-        : approvedAffiliation.club
-    ).trim();
-    const targetAffiliationId = String(approvedAffiliation._id || "").trim();
-    const targetLoftId = String(nextPayloadInput?.loft || "").trim();
-
+    
     if (!targetOwnerId) {
       return res.status(401).json({ error: "You must be logged in to add pigeon records." });
     }
 
-    if (!targetClubId) {
-      return res.status(403).json({
-        error: "Your approved membership must be associated with a valid club.",
-      });
-    }
+    let targetClubId = null;
+    let targetAffiliationId = null;
+    let targetLoftId = String(nextPayloadInput?.loft || "").trim();
 
-    if (!hasRoleBucket(req.auth, "member") && !canManageClubWorkspace(req.auth, targetClubId)) {
-      return res.status(403).json({
-        error: "Only members, owners, or secretaries can add pigeon records.",
-      });
+    if (isGuest) {
+      // Guest users can register personal pigeons without club affiliation
+      // Allow Guest role for personal pigeon registration
+      if (!hasRoleBucket(req.auth, "guest") && !hasRoleBucket(req.auth, "member")) {
+        return res.status(403).json({
+          error: "Only guests or members can add pigeon records.",
+        });
+      }
+      
+      // Guests cannot assign loft (must be null/undefined)
+      if (targetLoftId) {
+        return res.status(400).json({
+          error: "Guest users cannot assign pigeons to a loft until they join a club.",
+        });
+      }
+      
+      // For guests, club and affiliation will be null
+      targetClubId = null;
+      targetAffiliationId = null;
+    } else {
+      // Existing logic for members with approved affiliations
+      targetClubId = String(
+        typeof approvedAffiliation.club === "object" 
+          ? approvedAffiliation.club._id || approvedAffiliation.club
+          : approvedAffiliation.club
+      ).trim();
+      targetAffiliationId = String(approvedAffiliation._id || "").trim();
+
+      if (!targetClubId) {
+        return res.status(403).json({
+          error: "Your approved membership must be associated with a valid club.",
+        });
+      }
+
+      if (!hasRoleBucket(req.auth, "member") && !canManageClubWorkspace(req.auth, targetClubId)) {
+        return res.status(403).json({
+          error: "Only members, owners, or secretaries can add pigeon records.",
+        });
+      }
     }
 
     if (targetLoftId) {
@@ -493,7 +532,8 @@ export const createBird = async (req, res) => {
         return res.status(404).json({ error: "Assigned loft not found." });
       }
 
-      if (String(loft.club || "") !== targetClubId) {
+      // For guests, this should never be reached due to earlier validation
+      if (targetClubId && String(loft.club || "") !== targetClubId) {
         return res.status(400).json({
           error: "Assigned loft must belong to the same club as the pigeon record.",
         });
@@ -518,17 +558,21 @@ export const createBird = async (req, res) => {
       });
     }
 
-    const duplicateBird = await findDuplicateBandNumber({
-      bandNumber: nextPayloadInput.bandNumber,
-      clubId: targetClubId,
-    });
-
-    if (duplicateBird?._id) {
-      return res.status(409).json({
-        success: false,
-        message: "Band number already exists for this club.",
-        error: "Band number already exists for this club.",
+    // Check for duplicate band number - only for club-affiliated birds
+    // Guests can have any band number since they're not tied to a club yet
+    if (targetClubId) {
+      const duplicateBird = await findDuplicateBandNumber({
+        bandNumber: nextPayloadInput.bandNumber,
+        clubId: targetClubId,
       });
+
+      if (duplicateBird?._id) {
+        return res.status(409).json({
+          success: false,
+          message: "Band number already exists for this club.",
+          error: "Band number already exists for this club.",
+        });
+      }
     }
 
     const payloadInput = {
@@ -541,7 +585,8 @@ export const createBird = async (req, res) => {
       owner: targetOwnerId,
       ownerId: targetOwnerId,
       updatedBy: req.auth?.userId,
-      approvalStatus: "pending",
+      // For guests, set approval status differently since they're not affiliated with a club yet
+      approvalStatus: isGuest ? "pending" : "pending",
       approval: {
         ...(req.body?.approval || {}),
         requestedAt: new Date(),
@@ -549,6 +594,8 @@ export const createBird = async (req, res) => {
         approvedBy: undefined,
         rejectedAt: undefined,
         rejectedBy: undefined,
+        // Add note for guest pigeons
+        ...(isGuest ? { notes: "Personal pigeon - not yet club-affiliated" } : {}),
       },
     };
     const created = await Birds.create(payloadInput);
@@ -667,6 +714,7 @@ export const updateBird = async (req, res) => {
     const currentOwnerId = String(bird.ownerId || bird.owner || req.auth?.userId || "").trim();
     const isOwner = currentOwnerId === String(req.auth?.userId || "");
     const nextLoftId = String(req.body?.loft || bird.loft || "").trim();
+    const isGuest = hasRoleBucket(req.auth, "guest");
 
     if (currentOwnerId) {
       bird.ownerId = currentOwnerId;
@@ -682,6 +730,20 @@ export const updateBird = async (req, res) => {
       return res.status(403).json({
         error: "You do not have permission to update this pigeon record.",
       });
+    }
+
+    // Guests cannot assign loft or change club/affiliation
+    if (isGuest && !clubId) {
+      if (nextLoftId) {
+        return res.status(400).json({
+          error: "Guest users cannot assign pigeons to a loft until they join a club.",
+        });
+      }
+      if (req.body?.clubId || req.body?.club || req.body?.affiliation) {
+        return res.status(400).json({
+          error: "Guest users cannot modify club affiliation until they join a club.",
+        });
+      }
     }
 
     if (nextLoftId) {
@@ -728,18 +790,22 @@ export const updateBird = async (req, res) => {
         });
       }
 
-      const duplicateBird = await findDuplicateBandNumber({
-        bandNumber: payloadInput.bandNumber || bird.bandNumber,
-        clubId,
-        excludeId: bird._id,
-      });
-
-      if (duplicateBird?._id) {
-        return res.status(409).json({
-          success: false,
-          message: "Band number already exists for this club.",
-          error: "Band number already exists for this club.",
+      // Check for duplicate band number - only for club-affiliated birds
+      // Guests can have any band number since they're not tied to a club yet
+      if (clubId) {
+        const duplicateBird = await findDuplicateBandNumber({
+          bandNumber: payloadInput.bandNumber || bird.bandNumber,
+          clubId,
+          excludeId: bird._id,
         });
+
+        if (duplicateBird?._id) {
+          return res.status(409).json({
+            success: false,
+            message: "Band number already exists for this club.",
+            error: "Band number already exists for this club.",
+          });
+        }
       }
 
       bird.set({
@@ -986,31 +1052,73 @@ export const transferBirdOwnership = async (req, res) => {
 
 export const deleteBird = async (req, res) => {
   try {
-    const bird = await Birds.findById(req.params.id).select("club clubId").lean();
+    const bird = await Birds.findById(req.params.id).select("club owner ownerId").lean();
 
     if (!bird) return res.status(404).json({ error: "Bird not found" });
 
-    const clubId = normalizeTenantId(bird.club || bird.clubId);
+    const clubId = normalizeTenantId(bird.club);
+    const ownerId = normalizeTenantId(bird.owner || bird.ownerId);
+    const isOwner = normalizeTenantId(req.auth?.userId) === ownerId;
+    const isGuest = hasRoleBucket(req.auth, "guest");
 
-    if (!canManageClubWorkspace(req.auth, clubId)) {
-      return denyTenantAccess(req, res, {
-        attemptedClubId: clubId,
-        reason: "Pigeon archive attempted outside the authenticated user's tenant.",
+    // Guests can delete their own pigeons even without club affiliation
+    if (isGuest && !isOwner) {
+      return res.status(403).json({
+        error: "Guests can only delete their own pigeons.",
       });
     }
 
-    const payload = await populateBird(
-      Birds.findByIdAndUpdate(
-        req.params.id,
-        { deletedAt: new Date().toISOString(), status: "archived" },
-        { new: true },
-      ),
-    ).lean({ virtuals: true });
+    // For non-guests, check club access
+    if (!isGuest && clubId && !canAccessClubWorkspace(req.auth, clubId)) {
+      return denyTenantAccess(req, res, {
+        attemptedClubId: clubId,
+        reason: "Bird deletion attempted outside the authenticated user's tenant.",
+      });
+    }
+
+    if (
+      !isOwner &&
+      !canManageClubWorkspace(req.auth, clubId)
+    ) {
+      return res.status(403).json({
+        error: "Only bird owners or club managers can delete birds.",
+      });
+    }
+
+    const payload = await Birds.findByIdAndUpdate(
+      req.params.id,
+      {
+        deletedAt: new Date().toISOString(),
+        status: "archived",
+      },
+      { new: true },
+    )
+      .select("-__v")
+      .lean();
 
     if (!payload) return res.status(404).json({ error: "Bird not found" });
     clearCacheByPrefix("dashboard:stats");
 
     res.json({ success: "Bird archived successfully", payload });
+  } catch (error) {
+    sendError(res, error);
+  }
+};
+
+// Public endpoint for landing page stats
+export const findPublicBirds = async (req, res) => {
+  try {
+    const publicBirds = await Birds.find({ 
+      deletedAt: { $exists: false },
+      status: { $in: ["active", "breeding", "training"] },
+      approvalStatus: "approved"
+    })
+    .populate("owner", "username fullName")
+    .select("bandNumber name sex status owner approvalStatus")
+    .lean()
+    .limit(500); // Limit for performance and security
+
+    res.json({ success: "Public birds fetched successfully", payload: publicBirds });
   } catch (error) {
     sendError(res, error);
   }

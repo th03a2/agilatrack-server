@@ -82,88 +82,118 @@ const normalizeUserPayload = (
   { allowAdminFields = false, allowPassword = false } = {},
 ) => {
   const nextPayload = {};
-  const trimmedEmail = String(payload.email || "").trim().toLowerCase();
-  const originalUsername = String(payload.username || "").trim();
-  const trimmedUsername = originalUsername.toLowerCase(); // Only for validation
   const trimmedMobile = String(payload.mobile || "").trim();
   const fullName =
     payload.fullName && typeof payload.fullName === "object" ? payload.fullName : null;
   const nickname = payload.fullName?.nickname;
 
-  if (payload.email !== undefined) {
-    if (!trimmedEmail) {
-      throw Object.assign(new Error("Email is required."), { status: 400 });
+  // IDENTITY FIELDS - LOCKED for normal users, only editable by admins
+  if (allowAdminFields) {
+    // Email - only admins can change
+    if (payload.email !== undefined) {
+      const trimmedEmail = String(payload.email || "").trim().toLowerCase();
+      if (!trimmedEmail) {
+        throw Object.assign(new Error("Email is required."), { status: 400 });
+      }
+      if (!EMAIL_PATTERN.test(trimmedEmail)) {
+        throw Object.assign(new Error("Enter a valid email address."), { status: 400 });
+      }
+      nextPayload.email = trimmedEmail;
     }
 
-    if (!EMAIL_PATTERN.test(trimmedEmail)) {
-      throw Object.assign(new Error("Enter a valid email address."), { status: 400 });
+    // Username - only admins can change
+    if (payload.username !== undefined) {
+      const originalUsername = String(payload.username || "").trim();
+      const trimmedUsername = originalUsername.toLowerCase();
+      if (!trimmedUsername) {
+        throw Object.assign(new Error("Username is required."), { status: 400 });
+      }
+      if (!USERNAME_PATTERN.test(trimmedUsername)) {
+        throw Object.assign(
+          new Error(
+            "Username must be 4-32 characters and can only use letters, numbers, dots, dashes, or underscores.",
+          ),
+          { status: 400 },
+        );
+      }
+      nextPayload.username = originalUsername;
+      if (originalUsername) {
+        nextPayload.normalizedNickname = normalizeNickname(originalUsername);
+      }
     }
 
-    nextPayload.email = trimmedEmail;
-  }
+    // Identity name fields - only admins can change
+    if (fullName) {
+      const fname = String(fullName.fname || "").trim();
+      const lname = String(fullName.lname || "").trim();
+      const mname = String(fullName.mname || "").trim();
+      const suffix = String(fullName.suffix || "").trim();
 
-  if (payload.username !== undefined) {
-    if (!trimmedUsername) {
-      throw Object.assign(new Error("Username is required."), { status: 400 });
+      if (payload.fullName?.fname !== undefined && !fname) {
+        throw Object.assign(new Error("First name is required."), { status: 400 });
+      }
+      if (payload.fullName?.lname !== undefined && !lname) {
+        throw Object.assign(new Error("Last name is required."), { status: 400 });
+      }
+
+      nextPayload.fullName = {
+        ...(fname ? { fname } : {}),
+        ...(lname ? { lname } : {}),
+        ...(mname ? { mname } : {}),
+        ...(suffix ? { suffix } : {}),
+        ...(nickname !== undefined ? { nickname: nickname.trim() } : {}),
+      };
     }
 
-    if (!USERNAME_PATTERN.test(trimmedUsername)) {
-      throw Object.assign(
-        new Error(
-          "Username must be 4-32 characters and can only use letters, numbers, dots, dashes, or underscores.",
-        ),
-        { status: 400 },
-      );
+    // Sex/Gender - only admins can change
+    if (payload.isMale !== undefined) {
+      nextPayload.isMale = Boolean(payload.isMale);
     }
 
-    nextPayload.username = originalUsername; // Preserve original capitalization
-    // Add normalizedNickname for uniqueness checking
-    if (originalUsername) {
-      nextPayload.normalizedNickname = normalizeNickname(originalUsername);
-    }
-  }
-
-  if (payload.mobile !== undefined) {
-    if (trimmedMobile && !MOBILE_PATTERN.test(trimmedMobile)) {
-      throw Object.assign(new Error("Enter a valid contact number."), {
-        status: 400,
-      });
+    // PII fields (birth info) - only admins can change
+    if (payload.pii && typeof payload.pii === "object") {
+      nextPayload.pii = {
+        ...(payload.pii.dob ? { dob: String(payload.pii.dob).trim() } : {}),
+        ...(payload.pii.pob ? { pob: String(payload.pii.pob).trim() } : {}),
+      };
     }
 
-    nextPayload.mobile = trimmedMobile;
-  }
-
-  if (fullName) {
-    const fname = String(fullName.fname || "").trim();
-    const lname = String(fullName.lname || "").trim();
-    const mname = String(fullName.mname || "").trim();
-
-    if (payload.fullName?.fname !== undefined && !fname) {
-      throw Object.assign(new Error("First name is required."), { status: 400 });
+    // Address - only admins can change
+    if (payload.address && typeof payload.address === "object") {
+      nextPayload.address = {
+        ...(payload.address.region ? { region: String(payload.address.region).trim() } : {}),
+        ...(payload.address.province ? { province: String(payload.address.province).trim() } : {}),
+        ...(payload.address.city ? { city: String(payload.address.city).trim() } : {}),
+        ...(payload.address.barangay ? { barangay: String(payload.address.barangay).trim() } : {}),
+        ...(payload.address.zip ? { zip: String(payload.address.zip).trim() } : {}),
+      };
     }
-
-    if (payload.fullName?.lname !== undefined && !lname) {
-      throw Object.assign(new Error("Last name is required."), { status: 400 });
-    }
-
-    nextPayload.fullName = {
-      ...(fname ? { fname } : {}),
-      ...(lname ? { lname } : {}),
-      ...(mname ? { mname } : {}),
-      ...(nickname !== undefined ? { nickname: nickname.trim() } : {}),
-    };
+  } else {
+    // NORMAL USERS - Only editable fields allowed
     
-    // Add normalizedNickname if nickname is provided
+    // Mobile number - editable by normal users
+    if (payload.mobile !== undefined) {
+      if (trimmedMobile && !MOBILE_PATTERN.test(trimmedMobile)) {
+        throw Object.assign(new Error("Enter a valid contact number."), {
+          status: 400,
+        });
+      }
+      nextPayload.mobile = trimmedMobile;
+    }
+
+    // Nickname only - editable by normal users
     if (nickname !== undefined) {
       const trimmedNickname = nickname.trim();
+      nextPayload.fullName = { nickname: trimmedNickname };
       if (trimmedNickname) {
         nextPayload.normalizedNickname = normalizeNickname(trimmedNickname);
       }
     }
-  }
 
-  if (payload.isMale !== undefined) {
-    nextPayload.isMale = Boolean(payload.isMale);
+    // Profile photo - editable by normal users
+    if (payload.profilePhoto !== undefined) {
+      nextPayload.profilePhoto = String(payload.profilePhoto).trim();
+    }
   }
 
   if (Array.isArray(payload.state)) {
@@ -481,6 +511,23 @@ export const validateNickname = async (req, res) => {
         suggestions: validation.suggestions
       });
     }
+  } catch (error) {
+    sendError(res, error);
+  }
+};
+
+// Public endpoint for landing page stats
+export const findPublicUsers = async (req, res) => {
+  try {
+    const publicUsers = await Users.find({ 
+      isActive: true,
+      "profile.status": "approved"
+    })
+    .select("username fullName email profile.createdAt")
+    .lean()
+    .limit(1000); // Limit for performance and security
+
+    res.json({ success: "Public users fetched successfully", payload: publicUsers });
   } catch (error) {
     sendError(res, error);
   }

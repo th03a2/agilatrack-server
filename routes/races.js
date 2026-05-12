@@ -5,6 +5,7 @@ import {
   findAll,
   findOne,
   updateRace,
+  findPublicRaces,
 } from "../controllers/Races.js";
 import {
   bookRacePigeons,
@@ -22,6 +23,10 @@ import { raceSchemas } from "../validations/schemas.js";
 
 const router = express.Router();
 
+// Public endpoint for landing page stats (no auth required)
+router.get("/public", findPublicRaces);
+
+// Protected endpoints
 router.get("/", requireSessionUser, findAll);
 router.post(
   "/:raceId/book",

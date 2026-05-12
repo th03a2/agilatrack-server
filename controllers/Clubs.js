@@ -497,3 +497,20 @@ export const findTree = async (req, res) => {
     sendError(res, error);
   }
 };
+
+// Public endpoint for landing page stats
+export const findPublicClubs = async (req, res) => {
+  try {
+    const publicClubs = await Clubs.find({ 
+      deletedAt: { $exists: false },
+      isActive: true
+    })
+    .select("name level location contactInfo")
+    .lean()
+    .limit(100); // Limit for performance and security
+
+    res.json({ success: "Public clubs fetched successfully", payload: publicClubs });
+  } catch (error) {
+    sendError(res, error);
+  }
+};

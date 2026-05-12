@@ -362,7 +362,7 @@ const modelSchema = new Schema(
     club: {
       type: Schema.Types.ObjectId,
       ref: "Clubs",
-      required: true,
+      required: false, // Optional for guest pigeons
     },
     clubId: {
       type: Schema.Types.ObjectId,
@@ -371,16 +371,17 @@ const modelSchema = new Schema(
     ownerId: {
       type: Schema.Types.ObjectId,
       ref: "Users",
-      required: true,
+      required: true, // Always required for ownership tracking
     },
     owner: {
       type: Schema.Types.ObjectId,
       ref: "Users",
-      required: true,
+      required: true, // Always required for ownership tracking
     },
     affiliation: {
       type: Schema.Types.ObjectId,
       ref: "Affiliations",
+      required: false, // Optional for guest pigeons
     },
     loft: {
       type: Schema.Types.ObjectId,
@@ -567,7 +568,10 @@ modelSchema.index(
   { club: 1, bandNumber: 1 },
   {
     unique: true,
-    partialFilterExpression: { deletedAt: { $exists: false } },
+    partialFilterExpression: { 
+      deletedAt: { $exists: false },
+      club: { $exists: true, $ne: null } // Only enforce uniqueness for club-affiliated birds
+    },
   },
 );
 modelSchema.index({ owner: 1, status: 1, deletedAt: 1 });
