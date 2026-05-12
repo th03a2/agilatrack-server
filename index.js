@@ -6,7 +6,10 @@ import mongoose from "mongoose";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { getHealth } from "./controllers/liveOps.js";
-import { apiNotFoundHandler, errorHandler } from "./middlewares/errorHandler.js";
+import {
+  apiNotFoundHandler,
+  errorHandler,
+} from "./middlewares/errorHandler.js";
 import { requestLogger } from "./middleware/requestLogger.js";
 import { sanitizeRequest } from "./middleware/sanitizeRequest.js";
 import AffiliationsRouter from "./routes/affiliations.js";
@@ -58,6 +61,7 @@ const buildAllowedOrigins = () => {
     "http://localhost:5173",
     "http://127.0.0.1:4173",
     "http://127.0.0.1:5173",
+    "https://agila-track.technowiz.work",
   ];
 
   return Array.from(new Set([...configuredOrigins, ...defaultOrigins]));
@@ -66,11 +70,20 @@ const buildAllowedOrigins = () => {
 const allowedOrigins = buildAllowedOrigins();
 
 const corsOptions = {
-  allowedHeaders: ["Authorization", "Content-Type", "X-Device-Id", "X-Owner-Zone-Token"],
+  allowedHeaders: [
+    "Authorization",
+    "Content-Type",
+    "X-Device-Id",
+    "X-Owner-Zone-Token",
+  ],
   credentials: true,
   methods: ["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"],
   origin(origin, callback) {
-    if (!origin || allowedOrigins.includes("*") || allowedOrigins.includes(origin)) {
+    if (
+      !origin ||
+      allowedOrigins.includes("*") ||
+      allowedOrigins.includes(origin)
+    ) {
       return callback(null, true);
     }
 
@@ -100,13 +113,17 @@ const getMongoConnectionSummary = (uri) => {
 const logMongoStartupError = (error) => {
   if (
     error?.name === "MongooseServerSelectionError" ||
-    /querySrv|ENOTFOUND|ETIMEDOUT|ECONNREFUSED|IP address/i.test(error?.message || "")
+    /querySrv|ENOTFOUND|ETIMEDOUT|ECONNREFUSED|IP address/i.test(
+      error?.message || "",
+    )
   ) {
     const summary = getMongoConnectionSummary(MONGO_URI);
 
     console.error("[startup] MongoDB connection could not be reached.");
     if (summary) {
-      console.error(`[startup] Trying to connect to "${summary.host}" as "${summary.user}".`);
+      console.error(
+        `[startup] Trying to connect to "${summary.host}" as "${summary.user}".`,
+      );
     }
     console.error(`[startup] Original error: ${error.message || error}`);
     console.error(
@@ -115,7 +132,10 @@ const logMongoStartupError = (error) => {
     return;
   }
 
-  if (error?.codeName === "AtlasError" && /bad auth/i.test(error.message || "")) {
+  if (
+    error?.codeName === "AtlasError" &&
+    /bad auth/i.test(error.message || "")
+  ) {
     const summary = getMongoConnectionSummary(MONGO_URI);
 
     console.error("[startup] MongoDB authentication failed.");
@@ -145,6 +165,9 @@ app.use(
     crossOriginResourcePolicy: false,
   }),
 );
+
+app.use(express.static(path.join(__dirname, "view")));
+
 app.use(cors(corsOptions));
 app.use(requestLogger({ skip: () => NODE_ENV === "test" }));
 app.use(express.json({ limit: "15mb" }));
@@ -232,12 +255,11 @@ app.get("/api/routes", (req, res) => {
   });
 });
 
-app.use(apiNotFoundHandler);
-app.use(express.static(path.join(__dirname, "view")));
-
 app.get(/^(?!\/(?:api|nbi)(?:\/|$)).*/, (_, res) => {
   res.sendFile(path.join(__dirname, "view", "index.html"));
 });
+
+app.use(apiNotFoundHandler);
 
 app.use(errorHandler);
 
@@ -253,7 +275,9 @@ mongoose.connection.on("disconnected", () => {
 
 mongoose
   .connect(MONGO_URI, {
-    serverSelectionTimeoutMS: Number(process.env.MONGO_SERVER_SELECTION_TIMEOUT_MS || 15000),
+    serverSelectionTimeoutMS: Number(
+      process.env.MONGO_SERVER_SELECTION_TIMEOUT_MS || 15000,
+    ),
   })
   .then(() => {
     const summary = getMongoConnectionSummary(MONGO_URI);
