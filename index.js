@@ -30,6 +30,7 @@ import loftsRouter from "./routes/lofts.js";
 import ownerZoneRouter from "./routes/ownerZone.js";
 import officersRouter from "./routes/officers.js";
 import portalStateRouter from "./routes/portalState.js";
+import publicRouter from "./routes/public.js";
 import raceEntriesRouter from "./routes/raceEntries.js";
 import racesRouter from "./routes/races.js";
 import reportsRouter from "./routes/reports.js";
@@ -197,6 +198,7 @@ app.use((error, req, res, next) => {
 
 app.use("/nbi/auth", authRouter);
 app.use("/api/auth", authRouter);
+app.use("/api/public", publicRouter);
 
 app.use("/nbi/commerce", commerceRouter);
 app.use("/nbi/affiliations", AffiliationsRouter);
