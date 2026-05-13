@@ -68,6 +68,10 @@ const sharedRouteGroups = [
   { path: "/lofts", description: "Manage lofts and loft location details" },
   { path: "/birds", description: "Manage bird profiles, ownership, and pedigree details" },
   {
+    path: "/birds/pending-approvals",
+    description: "Review pending pigeon registration approvals by club scope",
+  },
+  {
     path: "/ahp",
     description: "Manage Avian Health Profile records, treatments, and health history",
   },

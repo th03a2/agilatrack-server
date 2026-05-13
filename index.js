@@ -13,6 +13,7 @@ import {
 import { requestLogger } from "./middleware/requestLogger.js";
 import { sanitizeRequest } from "./middleware/sanitizeRequest.js";
 import AffiliationsRouter from "./routes/affiliations.js";
+import announcementsRouter from "./routes/announcements.js";
 import authRouter from "./routes/auth.js";
 import avianHealthProfilesRouter from "./routes/avianHealthProfiles.js";
 import birdsRouter from "./routes/birds.js";
@@ -199,6 +200,7 @@ app.use("/api/auth", authRouter);
 
 app.use("/nbi/commerce", commerceRouter);
 app.use("/nbi/affiliations", AffiliationsRouter);
+app.use("/nbi/announcements", announcementsRouter);
 app.use("/nbi/club-management", clubManagementRouter);
 app.use("/nbi/club-applications", clubApplicationsRouter);
 app.use("/nbi/clubs", clubsRouter);
@@ -222,6 +224,7 @@ app.use("/nbi", liveOpsRouter);
 
 app.use("/api/commerce", commerceRouter);
 app.use("/api/affiliations", AffiliationsRouter);
+app.use("/api/announcements", announcementsRouter);
 app.use("/api/club-management", clubManagementRouter);
 app.use("/api/club-applications", clubApplicationsRouter);
 app.use("/api/clubs", clubsRouter);

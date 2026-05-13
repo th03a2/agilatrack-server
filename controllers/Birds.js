@@ -124,6 +124,84 @@ const buildBirdQuery = (query = {}) => {
   return dbQuery;
 };
 
+const formatPersonName = (value, fallback = "Unknown") => {
+  if (!value) return fallback;
+
+  if (typeof value === "string") {
+    return value.trim() || fallback;
+  }
+
+  if (typeof value === "object") {
+    const nameParts = [
+      value.fname,
+      value.mname,
+      value.lname,
+      value.firstName,
+      value.middleName,
+      value.lastName,
+    ]
+      .map((part) => String(part || "").trim())
+      .filter(Boolean);
+
+    if (nameParts.length) {
+      return nameParts.join(" ");
+    }
+
+    if (value.fullName && value.fullName !== value) {
+      return formatPersonName(value.fullName, fallback);
+    }
+
+    if (value.name && value.name !== value) {
+      return formatPersonName(value.name, fallback);
+    }
+
+    const fallbackParts = [value.username, value.email]
+      .map((part) => String(part || "").trim())
+      .filter(Boolean);
+
+    return fallbackParts.length ? fallbackParts.join(" ") : fallback;
+  }
+
+  return String(value);
+};
+
+const getPopulatedUser = (primary, secondary) => {
+  if (primary && typeof primary === "object") return primary;
+  if (secondary && typeof secondary === "object") return secondary;
+
+  return {};
+};
+
+const mapPendingApprovalBird = (bird = {}) => {
+  const owner = getPopulatedUser(bird.ownerId, bird.owner);
+  const loft = bird.loft && typeof bird.loft === "object" ? bird.loft : {};
+  const approval = bird.approval || {};
+  const status = bird.approvalStatus || "pending";
+  const reviewedAt = status === "approved" ? approval.approvedAt : approval.rejectedAt;
+  const reviewer = status === "approved" ? approval.approvedBy : approval.rejectedBy;
+
+  return {
+    _id: String(bird._id || ""),
+    age: bird.hatchYear ? String(new Date().getFullYear() - Number(bird.hatchYear)) : "",
+    bandNumber: bird.bandNumber || "",
+    birdId: String(bird._id || ""),
+    breed: bird.breed || bird.strain || bird.category || "",
+    color: bird.color || "",
+    fancierEmail: owner.email || "",
+    fancierId: String(owner._id || bird.ownerId || bird.owner || ""),
+    fancierName: formatPersonName(owner.fullName || owner.name || owner, "Unknown Fancier"),
+    loftId: String(loft._id || bird.loft || ""),
+    loftName: loft.name || "Unassigned Loft",
+    name: bird.name || "Unnamed",
+    rejectionReason: approval.reason || "",
+    reviewedAt,
+    reviewedBy: reviewer ? formatPersonName(reviewer, String(reviewer || "")) : "",
+    sex: bird.sex || "unknown",
+    status,
+    submittedAt: approval.requestedAt || bird.createdAt || new Date(),
+  };
+};
+
 const canViewBird = (auth = {}, bird = {}) => {
   const birdClubId =
     bird?.club && typeof bird.club === "object"
@@ -436,6 +514,70 @@ export const findAll = async (req, res) => {
     });
   } catch (error) {
     sendError(res, error);
+  }
+};
+
+export const findPendingApprovals = async (req, res) => {
+  try {
+    const requestedClubId = String(req.query?.club || req.query?.clubId || "").trim();
+    const requestedStatus = String(req.query?.status || "pending").trim().toLowerCase();
+    const validStatuses = new Set(["all", "approved", "pending", "rejected"]);
+
+    if (!validStatuses.has(requestedStatus)) {
+      return res.status(400).json({
+        error: "Bird approval status must be pending, approved, rejected, or all.",
+      });
+    }
+
+    const dbQuery = { deletedAt: { $exists: false } };
+
+    if (requestedStatus !== "all") {
+      dbQuery.approvalStatus = requestedStatus;
+    }
+
+    if (requestedClubId) {
+      if (!isValidObjectId(requestedClubId)) {
+        return res.status(400).json({ error: "A valid club id is required." });
+      }
+
+      if (!canManageClubWorkspace(req.auth, requestedClubId)) {
+        return denyTenantAccess(req, res, {
+          attemptedClubId: requestedClubId,
+          message: "You do not have permission to review pigeon approvals for this club.",
+          reason: "Pigeon approval queue requested another club.",
+        });
+      }
+
+      dbQuery.$or = [{ club: requestedClubId }, { clubId: requestedClubId }];
+    } else if (!isTenantSuperAdmin(req.auth)) {
+      const manageableClubIds = getTenantAccessibleClubIds(req.auth).filter((clubId) =>
+        canManageClubWorkspace(req.auth, clubId),
+      );
+
+      if (!manageableClubIds.length) {
+        return res.status(400).json({
+          error: "Select an active club before viewing pending pigeon approvals.",
+        });
+      }
+
+      dbQuery.$or = [
+        { club: { $in: manageableClubIds } },
+        { clubId: { $in: manageableClubIds } },
+      ];
+    }
+
+    const birds = await populateBird(Birds.find(dbQuery))
+      .sort({ createdAt: -1 })
+      .lean({ virtuals: true });
+    const payload = birds.map(mapPendingApprovalBird);
+
+    return res.json({
+      success: "Pending bird approvals fetched successfully",
+      data: payload,
+      payload,
+    });
+  } catch (error) {
+    return sendError(res, error, error?.status || 400);
   }
 };
 
@@ -845,6 +987,13 @@ export const updateBirdApproval = async (req, res) => {
     if (!bird) return res.status(404).json({ error: "Bird not found" });
 
     const clubId = normalizeTenantId(bird.club || bird.clubId);
+    const nextStatus = String(req.body?.approvalStatus || "pending").trim().toLowerCase();
+
+    if (!["approved", "pending", "rejected"].includes(nextStatus)) {
+      return res.status(400).json({
+        error: "Bird approval status must be approved, pending, or rejected.",
+      });
+    }
 
     if (!canManageClubWorkspace(req.auth, clubId)) {
       return denyTenantAccess(req, res, {
@@ -853,12 +1002,39 @@ export const updateBirdApproval = async (req, res) => {
       });
     }
 
+    const nextApproval = {
+      ...(bird.approval?.toObject?.() || bird.approval || {}),
+      ...(req.body?.approval || {}),
+    };
+
+    if (nextStatus === "approved") {
+      nextApproval.approvedAt = new Date();
+      nextApproval.approvedBy = req.auth?.userId;
+      nextApproval.rejectedAt = undefined;
+      nextApproval.rejectedBy = undefined;
+      nextApproval.reason = "";
+    }
+
+    if (nextStatus === "rejected") {
+      nextApproval.rejectedAt = new Date();
+      nextApproval.rejectedBy = req.auth?.userId;
+      nextApproval.approvedAt = undefined;
+      nextApproval.approvedBy = undefined;
+      nextApproval.reason = String(
+        req.body?.approval?.reason || req.body?.reason || nextApproval.reason || "",
+      ).trim();
+    }
+
+    if (nextStatus === "pending") {
+      nextApproval.approvedAt = undefined;
+      nextApproval.approvedBy = undefined;
+      nextApproval.rejectedAt = undefined;
+      nextApproval.rejectedBy = undefined;
+    }
+
     bird.set({
-      approvalStatus: req.body?.approvalStatus || "pending",
-      approval: {
-        ...(bird.approval?.toObject?.() || bird.approval || {}),
-        ...(req.body?.approval || {}),
-      },
+      approvalStatus: nextStatus,
+      approval: nextApproval,
     });
     await bird.save();
 

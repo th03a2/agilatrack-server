@@ -3,6 +3,7 @@ import {
   bulkUpdateBirdHealth,
   createBird,
   deleteBird,
+  findPendingApprovals,
   findAll,
   findOne,
   transferBirdOwnership,
@@ -27,6 +28,12 @@ router.get("/public", findPublicBirds);
 
 // Protected endpoints
 router.get("/", requireSessionUser, findAll);
+router.get(
+  "/pending-approvals",
+  requireSessionUser,
+  requireAnyPermission("admin:manage", "club:manage", "operations:manage"),
+  findPendingApprovals,
+);
 router.patch(
   "/bulk-health",
   requireSessionUser,
