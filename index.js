@@ -218,6 +218,7 @@ app.use("/nbi/ahp", avianHealthProfilesRouter);
 app.use("/nbi/avian-health-profiles", avianHealthProfilesRouter);
 app.use("/nbi/pigeons", birdsRouter);
 app.use("/nbi/upload", uploadsRouter);
+app.use("/api/upload", uploadsRouter);
 app.use("/nbi/race-entries", raceEntriesRouter);
 app.use("/nbi/races", racesRouter);
 app.use("/nbi/users", usersRouter);

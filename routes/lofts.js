@@ -16,7 +16,6 @@ router.get("/:id", requireSessionUser, validateObjectIdParam("id"), findOne);
 router.post(
   "/",
   requireSessionUser,
-  requireAnyPermission("club:manage", "records:self"),
   createLoft,
 );
 router.put(

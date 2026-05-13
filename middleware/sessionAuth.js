@@ -10,6 +10,8 @@ import {
 } from "../utils/auth.js";
 
 const ROLE_ALIASES = {
+  admin: "platform_admin",
+  administrator: "platform_admin",
   "appeals committee": "platform_admin",
   "assistant admin": "member",
   "basketing officer": "operator",
@@ -49,6 +51,7 @@ const ROLE_ALIASES = {
   "payment verifier": "finance",
   "pedigree encoder": "member",
   "pigeon registrar": "member",
+  "platform admin": "platform_admin",
   "prize fund officer": "finance",
   "race participant": "member",
   racer: "member",
@@ -59,6 +62,7 @@ const ROLE_ALIASES = {
   seller: "ecommerce",
   "shipping coordinator": "ecommerce",
   "shop manager": "ecommerce",
+  "super admin": "platform_admin",
   "system administrator": "platform_admin",
   "technical support": "platform_admin",
   vendor: "ecommerce",
@@ -83,12 +87,16 @@ const ECOMMERCE_ROLE_LABELS = new Set([
 ]);
 
 const PLATFORM_ADMIN_ROLE_LABELS = new Set([
+  "admin",
+  "administrator",
   "appeals committee",
   "club system admin",
   "compliance officer",
   "federation president",
   "federation secretary",
+  "platform admin",
   "regional coordinator",
+  "super admin",
   "system administrator",
   "technical support",
 ]);
@@ -169,7 +177,13 @@ const extractPermissions = ({ roleBuckets = [], roleLabels = [] } = {}) => {
     roleLabels.some((role) => PLATFORM_ADMIN_ROLE_LABELS.has(role))
   ) {
     permissions.add("admin:manage");
+    permissions.add("club:manage");
+    permissions.add("lofts:manage");
+    permissions.add("pigeons:manage");
     permissions.add("portal_state:manage");
+    permissions.add("races:manage");
+    permissions.add("records:manage");
+    permissions.add("users:manage");
   }
 
   if (
@@ -223,11 +237,14 @@ export function hasRoleBucket(auth = {}, bucket = "") {
 
 const GLOBAL_TENANT_ADMIN_LABELS = new Set([
   "admin",
+  "administrator",
   "appeals committee",
   "compliance officer",
   "federation president",
   "federation secretary",
+  "platform admin",
   "regional coordinator",
+  "super admin",
   "system administrator",
 ]);
 
@@ -251,9 +268,13 @@ const getAuthUserClubIds = (auth = {}) =>
 
 export function hasGlobalTenantAccess(auth = {}) {
   const roleLabels = Array.isArray(auth.roleLabels) ? auth.roleLabels : [];
+  const roleBuckets = Array.isArray(auth.roleBuckets) ? auth.roleBuckets : [];
   const labels = [auth?.user?.role, ...roleLabels].map((value) => normalizeRole(value));
 
-  return labels.some((label) => GLOBAL_TENANT_ADMIN_LABELS.has(label));
+  return (
+    roleBuckets.includes("platform_admin") ||
+    labels.some((label) => GLOBAL_TENANT_ADMIN_LABELS.has(label))
+  );
 }
 
 export function canAccessClubWorkspace(auth = {}, clubId = "") {

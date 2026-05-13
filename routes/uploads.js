@@ -26,7 +26,7 @@ router.post(
 router.post(
   "/fancier-logo",
   requireSessionUser,
-  requireAnyRoleBucket("member", "owner", "secretary", "operator", "admin"),
+  requireAnyRoleBucket("member", "owner", "secretary", "operator", "platform_admin"),
   multipartUploadParser,
   uploadAsset,
 );
@@ -34,7 +34,7 @@ router.post(
 router.post(
   "/loft-logo",
   requireSessionUser,
-  requireAnyRoleBucket("member", "owner", "secretary", "operator", "admin"),
+  requireAnyRoleBucket("member", "owner", "secretary", "operator", "platform_admin"),
   multipartUploadParser,
   uploadAsset,
 );
@@ -42,7 +42,7 @@ router.post(
 router.post(
   "/operator-logo",
   requireSessionUser,
-  requireAnyRoleBucket("operator", "admin"),
+  requireAnyRoleBucket("operator", "platform_admin"),
   multipartUploadParser,
   uploadAsset,
 );

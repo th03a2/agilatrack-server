@@ -1,4 +1,5 @@
 import { v2 as cloudinary } from "cloudinary";
+import Clubs from "../models/Clubs.js";
 import Users from "../models/Users.js";
 import {
   getTokenFromRequest,
@@ -23,6 +24,16 @@ const encodePathSegment = (value = "") =>
     .replace(/^-+|-+$/g, "") || "asset";
 const createStatusError = (message, status = 400) =>
   Object.assign(new Error(message), { status });
+
+const normalizeRoleLabel = (value = "") =>
+  normalizeFlag(value)
+    .replace(/[_-]+/g, " ")
+    .replace(/\s+/g, " ");
+
+const isPlatformAdminRole = (role = "") =>
+  ["admin", "administrator", "platform admin", "super admin", "system administrator"].includes(
+    normalizeRoleLabel(role),
+  );
 
 const getMultipartBoundary = (contentType = "") => {
   const match = String(contentType || "").match(/boundary=(?:"([^"]+)"|([^;]+))/i);
@@ -346,7 +357,12 @@ export const uploadAsset = async (req, res) => {
         });
       }
 
-      if (!["member", "owner", "secretary", "operator", "admin"].includes(user.role)) {
+      const userRole = normalizeRoleLabel(user.role);
+
+      if (
+        !["member", "owner", "secretary", "operator"].includes(userRole) &&
+        !isPlatformAdminRole(user.role)
+      ) {
         return res.status(403).json({
           error: "Access denied",
           message: "Only fanciers, club owners, secretaries, operators, and admins can upload logos.",
@@ -395,7 +411,12 @@ export const uploadAsset = async (req, res) => {
         });
       }
 
-      if (!["member", "owner", "secretary", "operator", "admin"].includes(user.role)) {
+      const userRole = normalizeRoleLabel(user.role);
+
+      if (
+        !["member", "owner", "secretary", "operator"].includes(userRole) &&
+        !isPlatformAdminRole(user.role)
+      ) {
         return res.status(403).json({
           error: "Access denied",
           message: "Only fanciers, club owners, secretaries, operators, and admins can upload loft logos.",
@@ -422,7 +443,7 @@ export const uploadAsset = async (req, res) => {
       // Check if user owns or manages the loft
       if (loft.ownerId?.toString() !== user._id.toString() && 
           loft.manager?.toString() !== user._id.toString() &&
-          user.role !== "admin") {
+          !isPlatformAdminRole(user.role)) {
         return res.status(403).json({
           error: "Access denied",
           message: "You can only upload logos for your own lofts.",
@@ -473,7 +494,9 @@ export const uploadAsset = async (req, res) => {
         });
       }
 
-      if (!["operator", "admin"].includes(user.role)) {
+      const userRole = normalizeRoleLabel(user.role);
+
+      if (userRole !== "operator" && !isPlatformAdminRole(user.role)) {
         return res.status(403).json({
           error: "Access denied",
           message: "Only operators and admins can upload operator logos.",
@@ -501,7 +524,7 @@ export const uploadAsset = async (req, res) => {
                         club.management.secretary?.user?.toString() === user._id.toString() ||
                         club.members.some(memberId => memberId.toString() === user._id.toString());
 
-      if (!isOperator && user.role !== "admin") {
+      if (!isOperator && !isPlatformAdminRole(user.role)) {
         return res.status(403).json({
           error: "Access denied",
           message: "You can only upload logos for clubs you operate or manage.",

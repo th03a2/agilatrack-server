@@ -15,7 +15,11 @@
     "debug:auth-response": "node scripts/debugAuthResponse.js",
     "test:super-admin-flow": "node scripts/testCompleteSuperAdminFlow.js",
     "test:frontend-mapping": "node scripts/testFrontendMapping.js",
-    "test:frontend-role-fix": "node scripts/testFrontendRoleFix.js"
+    "test:frontend-role-fix": "node scripts/testFrontendRoleFix.js",
+    "test:all-fixes": "node scripts/testAllFixes.js",
+    "test:super-admin-ui-fixes": "node scripts/testSuperAdminUIFixes.js",
+    "test:lofts-clubs-auth-fix": "node scripts/testLoftsClubsAuthFix.js",
+    "test:auth-headers": "node scripts/testAuthHeaders.js"
   },
   "keywords": [],
   "author": "",

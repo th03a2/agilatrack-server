@@ -319,7 +319,7 @@ export const findAll = async (req, res) => {
   try {
     if (!isTenantSuperAdmin(req.auth) && !hasPrivilegedDirectoryAccess(req.auth)) {
       return res.status(403).json({
-        error: "Only owner, secretary, or operator roles can browse all users.",
+        error: "Only owner, secretary, operator, or admin roles can browse users.",
       });
     }
 
@@ -381,7 +381,7 @@ export const createUser = async (req, res) => {
   try {
     if (!isTenantSuperAdmin(req.auth) && !hasPrivilegedDirectoryAccess(req.auth)) {
       return res.status(403).json({
-        error: "Only owner, secretary, or operator roles can create users here.",
+        error: "Only owner, secretary, operator, or admin roles can create users here.",
       });
     }
 
@@ -452,7 +452,7 @@ export const deleteUser = async (req, res) => {
   try {
     if (!isTenantSuperAdmin(req.auth) && !hasPrivilegedDirectoryAccess(req.auth)) {
       return res.status(403).json({
-        error: "Only owner, secretary, or operator roles can deactivate users.",
+        error: "Only owner, secretary, operator, or admin roles can deactivate users.",
       });
     }
 
