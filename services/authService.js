@@ -403,7 +403,7 @@ const buildActivePlatform = ({ user, activeAffiliation, isMobile }) => {
     auxiliary: [],
     club: currentPlatform?.club || null,
     portal: isMobile ? MOBILE_PORTAL : String(currentPlatform?.portal || "guest"),
-    role: null,
+    role: currentPlatform?.role || user?.role || null, // Preserve user role when no affiliation exists
   };
 };
 
@@ -912,9 +912,10 @@ export const register = async (req, res) => {
       mobile,
       password,
       profileCompleted: false,
-      role: "guest",
+      role: "guest", // Always force role to guest for public registration
       state,
       username,
+      // Explicitly ignore any role from request body - public registration is guest only
     });
 
     await verification.deleteOne();

@@ -7,7 +7,15 @@
     "dev": "nodemon index.js",
     "start": "node index.js",
     "seed": "node seeders/seedAgilaTrack.js",
-    "seed:reset": "node seeders/seedAgilaTrack.js --reset"
+    "seed:reset": "node seeders/seedAgilaTrack.js --reset",
+    "create:super-admin": "node scripts/createSuperAdmin.js",
+    "fix:super-admin": "node scripts/fixSuperAdmin.js",
+    "test:super-admin-login": "node scripts/testSuperAdminLogin.js",
+    "update:super-admin-password": "node scripts/updateSuperAdminPassword.js",
+    "debug:auth-response": "node scripts/debugAuthResponse.js",
+    "test:super-admin-flow": "node scripts/testCompleteSuperAdminFlow.js",
+    "test:frontend-mapping": "node scripts/testFrontendMapping.js",
+    "test:frontend-role-fix": "node scripts/testFrontendRoleFix.js"
   },
   "keywords": [],
   "author": "",
