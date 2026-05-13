@@ -9,7 +9,7 @@ import { getHealth } from "./controllers/liveOps.js";
 import {
   apiNotFoundHandler,
   errorHandler,
-} from "./middlewares/errorHandler.js";
+} from "./middleware/errors.js";
 import { requestLogger } from "./middleware/requestLogger.js";
 import { sanitizeRequest } from "./middleware/sanitizeRequest.js";
 import AffiliationsRouter from "./routes/affiliations.js";

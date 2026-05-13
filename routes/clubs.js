@@ -19,7 +19,7 @@ import {
   requireSessionUser,
 } from "../middleware/sessionAuth.js";
 import { validateObjectIdParam } from "../middleware/validateObjectId.js";
-import { validateRequest } from "../middlewares/validateRequest.js";
+import { validateRequest } from "../middleware/validateRequest.js";
 import { clubSchemas } from "../validations/schemas.js";
 
 const router = express.Router();

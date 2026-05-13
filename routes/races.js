@@ -18,7 +18,7 @@ import {
 } from "../controllers/RaceEntries.js";
 import { requireAnyPermission, requireSessionUser } from "../middleware/sessionAuth.js";
 import { validateObjectIdParam } from "../middleware/validateObjectId.js";
-import { validateRequest } from "../middlewares/validateRequest.js";
+import { validateRequest } from "../middleware/validateRequest.js";
 import { raceSchemas } from "../validations/schemas.js";
 
 const router = express.Router();

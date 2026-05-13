@@ -1,12 +1,11 @@
 import express from 'express';
-import { authMiddleware } from '../middleware/auth.js';
-import { roleMiddleware } from '../middleware/roleCheck.js';
-import Race from '../models/Race.js';
+import { requireSessionUser, requireAnyRoleBucket } from '../middleware/sessionAuth.js';
+import Race from '../models/Races.js';
 import RaceResult from '../models/RaceResult.js';
-import Bird from '../models/Bird.js';
-import Loft from '../models/Loft.js';
-import User from '../models/User.js';
-import { calculateAirDistance, calculateVelocity, generateRankings, validateBandFormat } from '../utils/gpsValidation.js';
+import Bird from '../models/Birds.js';
+import Loft from '../models/Lofts.js';
+import User from '../models/Users.js';
+import { calculateAirDistance, calculateVelocity, validateBandFormat } from '../utils/gpsValidation.js';
 
 const router = express.Router();
 
@@ -14,7 +13,7 @@ const router = express.Router();
  * POST /api/races/:raceId/results/compute
  * Compute race results for all participants
  */
-router.post('/:raceId/results/compute', authMiddleware, roleMiddleware(['operator', 'admin']), async (req, res) => {
+router.post('/:raceId/results/compute', requireSessionUser, requireAnyRoleBucket('operator', 'platform_admin'), async (req, res) => {
   try {
     const { raceId } = req.params;
     const { stationCoordinates, liberationTimestamp } = req.body;
@@ -117,7 +116,7 @@ router.post('/:raceId/results/compute', authMiddleware, roleMiddleware(['operato
  * GET /api/races/:raceId/results
  * Get race results
  */
-router.get('/:raceId/results', authMiddleware, async (req, res) => {
+router.get('/:raceId/results', requireSessionUser, async (req, res) => {
   try {
     const { raceId } = req.params;
     const { status, page = 1, limit = 50 } = req.query;
@@ -157,7 +156,7 @@ router.get('/:raceId/results', authMiddleware, async (req, res) => {
  * POST /api/race-results/:resultId/validate
  * Validate race result (operator only)
  */
-router.post('/race-results/:resultId/validate', authMiddleware, roleMiddleware(['operator', 'admin']), async (req, res) => {
+router.post('/race-results/:resultId/validate', requireSessionUser, requireAnyRoleBucket('operator', 'platform_admin'), async (req, res) => {
   try {
     const { resultId } = req.params;
     const { validatedBy, validatedAt, notes } = req.body;
@@ -195,7 +194,7 @@ router.post('/race-results/:resultId/validate', authMiddleware, roleMiddleware([
  * POST /api/race-results/:resultId/protest
  * Protest race result
  */
-router.post('/race-results/:resultId/protest', authMiddleware, async (req, res) => {
+router.post('/race-results/:resultId/protest', requireSessionUser, async (req, res) => {
   try {
     const { resultId } = req.params;
     const { protestReason, protestedBy, protestedAt } = req.body;
@@ -240,7 +239,7 @@ router.post('/race-results/:resultId/protest', authMiddleware, async (req, res) 
  * POST /api/race-results/:resultId/disqualify
  * Disqualify participant (operator only)
  */
-router.post('/race-results/:resultId/disqualify', authMiddleware, roleMiddleware(['operator', 'admin']), async (req, res) => {
+router.post('/race-results/:resultId/disqualify', requireSessionUser, requireAnyRoleBucket('operator', 'platform_admin'), async (req, res) => {
   try {
     const { resultId } = req.params;
     const { reason, disqualifiedBy, disqualifiedAt } = req.body;
@@ -286,7 +285,7 @@ router.post('/race-results/:resultId/disqualify', authMiddleware, roleMiddleware
  * POST /api/races/:raceId/publish-results
  * Publish official race results (operator only)
  */
-router.post('/:raceId/publish-results', authMiddleware, roleMiddleware(['operator', 'admin']), async (req, res) => {
+router.post('/:raceId/publish-results', requireSessionUser, requireAnyRoleBucket('operator', 'platform_admin'), async (req, res) => {
   try {
     const { raceId } = req.params;
     const { publishedBy, publishedAt } = req.body;
@@ -344,7 +343,7 @@ router.post('/:raceId/publish-results', authMiddleware, roleMiddleware(['operato
  * POST /api/races/:raceId/recompute-rankings
  * Recompute rankings after validation/disqualification changes
  */
-router.post('/:raceId/recompute-rankings', authMiddleware, roleMiddleware(['operator', 'admin']), async (req, res) => {
+router.post('/:raceId/recompute-rankings', requireSessionUser, requireAnyRoleBucket('operator', 'platform_admin'), async (req, res) => {
   try {
     const { raceId } = req.params;
     
@@ -393,7 +392,7 @@ router.post('/:raceId/recompute-rankings', authMiddleware, roleMiddleware(['oper
  * POST /api/races/:raceId/participants
  * Add participant to race
  */
-router.post('/:raceId/participants', authMiddleware, async (req, res) => {
+router.post('/:raceId/participants', requireSessionUser, async (req, res) => {
   try {
     const { raceId } = req.params;
     const { birdId, arrivalTimestamp, timingMethod, scannedBy } = req.body;
@@ -469,7 +468,7 @@ router.post('/:raceId/participants', authMiddleware, async (req, res) => {
  * GET /api/races/:raceId/statistics
  * Get race statistics
  */
-router.get('/:raceId/statistics', authMiddleware, async (req, res) => {
+router.get('/:raceId/statistics', requireSessionUser, async (req, res) => {
   try {
     const { raceId } = req.params;
     

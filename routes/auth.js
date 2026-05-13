@@ -14,7 +14,7 @@ import {
   validateRefresh,
   verifyEmailCode,
 } from "../controllers/Auth.js";
-import { validateRequest } from "../middlewares/validateRequest.js";
+import { validateRequest } from "../middleware/validateRequest.js";
 import { authSchemas } from "../validations/schemas.js";
 
 const router = express.Router();

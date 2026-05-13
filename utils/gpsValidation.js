@@ -229,7 +229,7 @@ function calculateBearing(from, to) {
   return (bearing + 360) % 360;
 }
 
-module.exports = {
+export {
   validateGPSCoordinates,
   calculateAirDistance,
   calculateVelocity,

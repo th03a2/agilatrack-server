@@ -1,6 +1,5 @@
 import express from 'express';
-import { authMiddleware } from '../middleware/auth.js';
-import { roleMiddleware } from '../middleware/roleCheck.js';
+import { requireSessionUser, requireAnyRoleBucket } from '../middleware/sessionAuth.js';
 import RaceStation from '../models/RaceStation.js';
 import LiberationRecord from '../models/LiberationRecord.js';
 import { validateGPSCoordinates, calculateAirDistance } from '../utils/gpsValidation.js';
@@ -11,7 +10,7 @@ const router = express.Router();
  * GET /api/race-stations
  * Get all race stations
  */
-router.get('/', authMiddleware, async (req, res) => {
+router.get('/', requireSessionUser, async (req, res) => {
   try {
     const { page = 1, limit = 20, region, province, isActive } = req.query;
     
@@ -50,7 +49,7 @@ router.get('/', authMiddleware, async (req, res) => {
  * GET /api/race-stations/:id
  * Get single race station
  */
-router.get('/:id', authMiddleware, async (req, res) => {
+router.get('/:id', requireSessionUser, async (req, res) => {
   try {
     const station = await RaceStation.findById(req.params.id)
       .populate('createdBy', 'name email');
@@ -79,7 +78,7 @@ router.get('/:id', authMiddleware, async (req, res) => {
  * POST /api/race-stations
  * Create new race station (operator/admin only)
  */
-router.post('/', authMiddleware, roleMiddleware(['operator', 'admin']), async (req, res) => {
+router.post('/', requireSessionUser, requireAnyRoleBucket('operator', 'platform_admin'), async (req, res) => {
   try {
     const {
       stationName,
@@ -123,7 +122,7 @@ router.post('/', authMiddleware, roleMiddleware(['operator', 'admin']), async (r
       province,
       description,
       isActive: true,
-      createdBy: req.user.id
+      createdBy: req.auth.userId
     });
     
     await station.save();
@@ -147,7 +146,7 @@ router.post('/', authMiddleware, roleMiddleware(['operator', 'admin']), async (r
  * PUT /api/race-stations/:id
  * Update race station (operator/admin only)
  */
-router.put('/:id', authMiddleware, roleMiddleware(['operator', 'admin']), async (req, res) => {
+router.put('/:id', requireSessionUser, requireAnyRoleBucket('operator', 'platform_admin'), async (req, res) => {
   try {
     const updates = req.body;
     
@@ -194,7 +193,7 @@ router.put('/:id', authMiddleware, roleMiddleware(['operator', 'admin']), async 
  * DELETE /api/race-stations/:id
  * Delete race station (admin only)
  */
-router.delete('/:id', authMiddleware, roleMiddleware(['admin']), async (req, res) => {
+router.delete('/:id', requireSessionUser, requireAnyRoleBucket('platform_admin'), async (req, res) => {
   try {
     const station = await RaceStation.findById(req.params.id);
     
@@ -233,7 +232,7 @@ router.delete('/:id', authMiddleware, roleMiddleware(['admin']), async (req, res
  * POST /api/race-stations/:id/liberation
  * Record liberation at race station (operator only)
  */
-router.post('/:id/liberation', authMiddleware, roleMiddleware(['operator', 'admin']), async (req, res) => {
+router.post('/:id/liberation', requireSessionUser, requireAnyRoleBucket('operator', 'platform_admin'), async (req, res) => {
   try {
     const { raceId, weatherConditions, notes, totalBirdsReleased, cratesReleased } = req.body;
     
@@ -257,7 +256,7 @@ router.post('/:id/liberation', authMiddleware, roleMiddleware(['operator', 'admi
       raceId,
       stationId: req.params.id,
       timestamp: new Date().toISOString(),
-      liberatedByOperator: req.user.name || req.user.email,
+      liberatedByOperator: req.auth.user.name || req.auth.user.email,
       weatherConditions,
       notes,
       totalBirdsReleased,
@@ -297,7 +296,7 @@ router.post('/:id/liberation', authMiddleware, roleMiddleware(['operator', 'admi
  * PUT /api/race-stations/:id/weather
  * Update weather conditions at race station (operator only)
  */
-router.put('/:id/weather', authMiddleware, roleMiddleware(['operator', 'admin']), async (req, res) => {
+router.put('/:id/weather', requireSessionUser, requireAnyRoleBucket('operator', 'platform_admin'), async (req, res) => {
   try {
     const { temperature, humidity, windDirection, windSpeed, conditions } = req.body;
     
@@ -338,7 +337,7 @@ router.put('/:id/weather', authMiddleware, roleMiddleware(['operator', 'admin'])
  * GET /api/race-stations/:id/distance/:loftId
  * Calculate distance from station to loft
  */
-router.get('/:id/distance/:loftId', authMiddleware, async (req, res) => {
+router.get('/:id/distance/:loftId', requireSessionUser, async (req, res) => {
   try {
     const station = await RaceStation.findById(req.params.id);
     if (!station) {
@@ -384,7 +383,7 @@ router.get('/:id/distance/:loftId', authMiddleware, async (req, res) => {
  * GET /api/race-stations/regions
  * Get list of available regions
  */
-router.get('/regions/list', authMiddleware, async (req, res) => {
+router.get('/regions/list', requireSessionUser, async (req, res) => {
   try {
     const regions = await RaceStation.distinct('region');
     
@@ -405,7 +404,7 @@ router.get('/regions/list', authMiddleware, async (req, res) => {
  * GET /api/race-stations/provinces/:region
  * Get list of provinces in a region
  */
-router.get('/provinces/:region', authMiddleware, async (req, res) => {
+router.get('/provinces/:region', requireSessionUser, async (req, res) => {
   try {
     const { region } = req.params;
     const provinces = await RaceStation.distinct('province', { region });

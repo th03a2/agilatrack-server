@@ -1,7 +1,6 @@
 import express from 'express';
-import { authMiddleware } from '../middleware/auth.js';
-import { roleMiddleware } from '../middleware/roleCheck.js';
-import Loft from '../models/Loft.js';
+import { requireSessionUser, requireAnyRoleBucket } from '../middleware/sessionAuth.js';
+import Loft from '../models/Lofts.js';
 import { validateGPSCoordinates } from '../utils/gpsValidation.js';
 
 const router = express.Router();
@@ -10,7 +9,7 @@ const router = express.Router();
  * PUT /api/lofts/:id/coordinates
  * Update loft GPS coordinates
  */
-router.put('/:id/coordinates', authMiddleware, async (req, res) => {
+router.put('/:id/coordinates', requireSessionUser, async (req, res) => {
   try {
     const { id } = req.params;
     const { coordinates } = req.body;
@@ -42,8 +41,8 @@ router.put('/:id/coordinates', authMiddleware, async (req, res) => {
     }
 
     // Check permissions (owner or operator can update)
-    const isOwner = loft.manager?._id.toString() === req.user.id;
-    const isOperator = req.user.role === 'operator' || req.user.role === 'admin';
+    const isOwner = loft.manager?._id.toString() === req.auth.userId;
+    const isOperator = req.auth.user.role === 'operator' || req.auth.user.role === 'admin';
     
     if (!isOwner && !isOperator) {
       return res.status(403).json({
@@ -88,7 +87,7 @@ router.put('/:id/coordinates', authMiddleware, async (req, res) => {
  * POST /api/lofts/:id/verify-gps
  * Verify loft GPS coordinates (operator only)
  */
-router.post('/:id/verify-gps', authMiddleware, roleMiddleware(['operator', 'admin']), async (req, res) => {
+router.post('/:id/verify-gps', requireSessionUser, requireAnyRoleBucket('operator', 'platform_admin'), async (req, res) => {
   try {
     const { id } = req.params;
     const { coordinates, verificationNotes } = req.body;
@@ -128,7 +127,7 @@ router.post('/:id/verify-gps', authMiddleware, roleMiddleware(['operator', 'admi
 
     loft.gpsVerification = {
       isVerified: true,
-      verifiedByOperator: req.user.name || req.user.email,
+      verifiedByOperator: req.auth.user.name || req.auth.user.email,
       verificationDate: new Date().toISOString(),
       verificationNotes: verificationNotes || 'Verified by operator'
     };
@@ -156,7 +155,7 @@ router.post('/:id/verify-gps', authMiddleware, roleMiddleware(['operator', 'admi
  * GET /api/lofts/:id/gps-status
  * Get loft GPS verification status
  */
-router.get('/:id/gps-status', authMiddleware, async (req, res) => {
+router.get('/:id/gps-status', requireSessionUser, async (req, res) => {
   try {
     const { id } = req.params;
     
@@ -169,9 +168,9 @@ router.get('/:id/gps-status', authMiddleware, async (req, res) => {
     }
 
     // Check permissions
-    const isOwner = loft.manager?._id.toString() === req.user.id;
-    const isOperator = req.user.role === 'operator' || req.user.role === 'admin';
-    const isClubMember = req.user.affiliation?.club?._id === loft.club?._id;
+    const isOwner = loft.manager?._id.toString() === req.auth.userId;
+    const isOperator = req.auth.user.role === 'operator' || req.auth.user.role === 'admin';
+    const isClubMember = req.auth.affiliations?.some(aff => aff.club?._id.toString() === loft.club?._id.toString());
     
     if (!isOwner && !isOperator && !isClubMember) {
       return res.status(403).json({
@@ -202,7 +201,7 @@ router.get('/:id/gps-status', authMiddleware, async (req, res) => {
  * POST /api/lofts/:id/reset-gps-verification
  * Reset GPS verification (operator only)
  */
-router.post('/:id/reset-gps-verification', authMiddleware, roleMiddleware(['operator', 'admin']), async (req, res) => {
+router.post('/:id/reset-gps-verification', requireSessionUser, requireAnyRoleBucket('operator', 'platform_admin'), async (req, res) => {
   try {
     const { id } = req.params;
     const { reason } = req.body;

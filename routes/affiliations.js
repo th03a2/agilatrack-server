@@ -12,7 +12,7 @@ import {
 } from "../controllers/Affiliations.js";
 import { requireAnyPermission, requireSessionUser } from "../middleware/sessionAuth.js";
 import { validateObjectIdParam } from "../middleware/validateObjectId.js";
-import { validateRequest } from "../middlewares/validateRequest.js";
+import { validateRequest } from "../middleware/validateRequest.js";
 import { affiliationSchemas } from "../validations/schemas.js";
 
 const router = express.Router();
