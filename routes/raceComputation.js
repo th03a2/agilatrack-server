@@ -3,11 +3,24 @@ import { requireSessionUser, requireAnyRoleBucket } from '../middleware/sessionA
 import Race from '../models/Races.js';
 import RaceResult from '../models/RaceResult.js';
 import Bird from '../models/Birds.js';
-import Loft from '../models/Lofts.js';
-import User from '../models/Users.js';
 import { calculateAirDistance, calculateVelocity, validateBandFormat } from '../utils/gpsValidation.js';
 
 const router = express.Router();
+
+const getIdString = (value) => String(value?._id || value || "");
+
+const formatUserName = (user) => {
+  if (!user) return "";
+  if (typeof user.name === "string" && user.name.trim()) return user.name.trim();
+
+  const fullName = user.fullName || {};
+  const name = [fullName.fname, fullName.mname, fullName.lname]
+    .filter(Boolean)
+    .join(" ")
+    .trim();
+
+  return name || user.email || "";
+};
 
 /**
  * POST /api/races/:raceId/results/compute
@@ -36,9 +49,9 @@ router.post('/:raceId/results/compute', requireSessionUser, requireAnyRoleBucket
     
     // Get all participants for this race
     const participants = await RaceResult.find({ raceId, status: { $ne: 'disqualified' } })
-      .populate('birdId', 'bandNumber name')
-      .populate('fancierId', 'name')
-      .populate('loftId', 'name coordinates');
+      .populate('pigeonId', 'bandNumber name')
+      .populate('fancierId', 'fullName email')
+      .populate('raceEntryId', 'loft loftSnapshot arrival bird');
     
     if (participants.length === 0) {
       return res.status(400).json({
@@ -49,26 +62,30 @@ router.post('/:raceId/results/compute', requireSessionUser, requireAnyRoleBucket
     
     // Calculate results for each participant
     const velocityCalculations = participants.map(participant => {
-      if (!participant.loftId.coordinates || !participant.arrivalTimestamp) {
+      const raceEntry = participant.raceEntryId;
+      const loftCoordinates = raceEntry?.loftSnapshot?.coordinates;
+      const arrivalTimestamp = participant.arrivalTimestamp || raceEntry?.arrival?.arrivedAt;
+
+      if (!loftCoordinates || !arrivalTimestamp) {
         return null;
       }
       
       try {
         // Calculate air distance from loft to release station
-        const distance = calculateAirDistance(participant.loftId.coordinates, stationCoordinates);
+        const distance = calculateAirDistance(loftCoordinates, stationCoordinates);
         
         // Calculate velocity based on flight time
-        const velocityCalc = calculateVelocity(distance, liberationTimestamp, participant.arrivalTimestamp);
+        const velocityCalc = calculateVelocity(distance, liberationTimestamp, arrivalTimestamp);
         
         return {
           participantId: participant._id,
-          birdId: participant.birdId._id,
-          bandNumber: participant.birdId.bandNumber,
-          birdName: participant.birdId.name,
-          fancierId: participant.fancierId._id,
-          fancierName: participant.fancierId.name,
-          loftId: participant.loftId._id,
-          loftName: participant.loftId.name,
+          birdId: getIdString(participant.pigeonId),
+          bandNumber: participant.bandNumber || participant.pigeonId?.bandNumber || raceEntry?.bird?.bandNumber,
+          birdName: participant.birdName || participant.pigeonId?.name || raceEntry?.bird?.name,
+          fancierId: getIdString(participant.fancierId),
+          fancierName: participant.fancierName || formatUserName(participant.fancierId),
+          loftId: getIdString(raceEntry?.loft),
+          loftName: participant.loftName || raceEntry?.loftSnapshot?.name,
           distance,
           ...velocityCalc
         };
@@ -125,9 +142,9 @@ router.get('/:raceId/results', requireSessionUser, async (req, res) => {
     if (status) filter.status = status;
     
     const results = await RaceResult.find(filter)
-      .populate('birdId', 'bandNumber name')
-      .populate('fancierId', 'name')
-      .populate('loftId', 'name')
+      .populate('pigeonId', 'bandNumber name')
+      .populate('fancierId', 'fullName email')
+      .populate('raceEntryId', 'loftSnapshot bird')
       .sort({ ranking: 1 })
       .limit(limit * 1)
       .skip((page - 1) * limit);
@@ -311,19 +328,24 @@ router.post('/:raceId/publish-results', requireSessionUser, requireAnyRoleBucket
       });
     }
     
-    // Update all validated results to official
+    // Update all validated results to published
     await RaceResult.updateMany(
       { raceId, status: 'validated' },
       { 
-        status: 'official',
+        status: 'published',
         publishedBy,
         publishedAt
       }
     );
     
-    // Update race status
-    race.status = 'published';
-    race.publishedAt = publishedAt;
+    race.results = {
+      ...(race.results?.toObject?.() || race.results || {}),
+      publishedAt: publishedAt ? new Date(publishedAt) : new Date(),
+      publishedBy: req.auth?.userId || publishedBy,
+      speedUnit: 'meters_per_minute',
+    };
+    race.status = 'completed';
+    race.updatedBy = req.auth?.userId;
     await race.save();
     
     res.json({

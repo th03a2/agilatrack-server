@@ -520,9 +520,10 @@ export const uploadAsset = async (req, res) => {
       }
 
       // Check if user is operator for this club or admin
-      const isOperator = club.management.owner?.user?.toString() === user._id.toString() ||
-                        club.management.secretary?.user?.toString() === user._id.toString() ||
-                        club.members.some(memberId => memberId.toString() === user._id.toString());
+      const clubMemberIds = Array.isArray(club.members) ? club.members : [];
+      const isOperator = club.management?.owner?.user?.toString() === user._id.toString() ||
+                        club.management?.secretary?.user?.toString() === user._id.toString() ||
+                        clubMemberIds.some(memberId => memberId.toString() === user._id.toString());
 
       if (!isOperator && !isPlatformAdminRole(user.role)) {
         return res.status(403).json({

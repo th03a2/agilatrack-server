@@ -14,6 +14,27 @@ const multipartUploadParser = express.raw({
       .startsWith("multipart/form-data"),
 });
 
+const requireUploadTarget = (...allowedTargets) => (req, res, next) => {
+  if (allowedTargets.includes(String(req.params.target || "").trim().toLowerCase())) {
+    return next();
+  }
+
+  return res.status(404).json({
+    error: "Unsupported upload target",
+    message: `Upload target "${req.params.target}" is not available.`,
+  });
+};
+
+const requireUploadTargetAccess = (req, res, next) => {
+  const target = String(req.params.target || "").trim().toLowerCase();
+
+  if (target === "profile-photo" || target === "valid-id" || target === "club-logo") {
+    return next();
+  }
+
+  return requireAnyRoleBucket("owner", "secretary", "operator", "platform_admin")(req, res, next);
+};
+
 router.post(
   "/bird-image",
   requireSessionUser,
@@ -47,6 +68,13 @@ router.post(
   uploadAsset,
 );
 
-router.post("/:target", requireSessionUser, multipartUploadParser, uploadAsset);
+router.post(
+  "/:target",
+  requireSessionUser,
+  requireUploadTarget("announcement-banner", "club-logo", "profile-photo", "valid-id"),
+  requireUploadTargetAccess,
+  multipartUploadParser,
+  uploadAsset,
+);
 
 export default router;

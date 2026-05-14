@@ -106,7 +106,6 @@ modelSchema.index({ clubId: 1, raceId: 1, status: 1 });
 modelSchema.index({ raceId: 1, status: 1 });
 modelSchema.index({ raceId: 1, ranking: 1 });
 modelSchema.index({ fancierId: 1, raceId: 1 });
-modelSchema.index({ loftId: 1, raceId: 1 });
 modelSchema.index({ bandNumber: 1, raceId: 1 });
 modelSchema.index({ velocity: -1 }); // For top performers
 

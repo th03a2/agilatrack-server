@@ -1,5 +1,4 @@
 import express from "express";
-import { genSalt, hash } from "bcryptjs";
 import Users from "../models/Users.js";
 import { verifySessionToken } from "../utils/auth.js";
 
@@ -117,14 +116,10 @@ router.post("/users", requireSuperAdmin, async (req, res) => {
       });
     }
 
-    // Hash password using same method as auth system
-    const salt = await genSalt(12);
-    const hashedPassword = await hash(password, salt);
-
     // Create admin user
     const adminUser = await Users.create({
       email: email.toLowerCase().trim(),
-      password: hashedPassword,
+      password,
       fullName: {
         fname: fname.trim(),
         lname: lname.trim(),

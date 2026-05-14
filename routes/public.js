@@ -23,24 +23,28 @@ router.get("/stats", async (req, res) => {
     ] = await Promise.allSettled([
       // Count active/registered pigeons/birds
       Birds.countDocuments({
-        status: { $in: ["active", "registered"] }
+        deletedAt: { $exists: false },
+        approvalStatus: "approved",
+        status: { $in: ["active", "breeding", "training"] }
       }),
       // Count active users with owner/fancier/member roles
       Users.countDocuments({
         isActive: true,
         $or: [
-          { roles: { $in: ["owner", "fancier", "member"] } },
+          { role: { $in: ["owner", "member"] } },
           { membership: { $in: ["owner", "fancier", "member"] } }
         ]
       }),
       // Count active/approved clubs
       Clubs.countDocuments({
         isActive: true,
-        status: { $in: ["active", "approved"] }
+        deletedAt: { $exists: false },
+        status: "approved"
       }),
       // Count completed/published/official race records
       Races.countDocuments({
-        status: { $in: ["completed", "published", "official"] }
+        deletedAt: { $exists: false },
+        status: "completed"
       })
     ]);
 

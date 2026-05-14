@@ -112,7 +112,7 @@ const raceStationSchema = new mongoose.Schema({
   },
   createdBy: {
     type: mongoose.Schema.Types.ObjectId,
-    ref: 'User',
+    ref: 'Users',
     required: true
   },
   createdAt: {
@@ -131,7 +131,6 @@ const raceStationSchema = new mongoose.Schema({
 // Index for efficient queries
 raceStationSchema.index({ region: 1, province: 1 });
 raceStationSchema.index({ isActive: 1 });
-raceStationSchema.index({ stationName: 1 });
 
 // Update updatedAt on save
 raceStationSchema.pre('save', function(next) {

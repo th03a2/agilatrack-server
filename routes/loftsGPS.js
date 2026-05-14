@@ -1,6 +1,7 @@
 import express from 'express';
 import {
   hasGlobalTenantAccess,
+  hasRoleBucket,
   requireSessionUser,
   requireAnyRoleBucket,
 } from '../middleware/sessionAuth.js';
@@ -45,10 +46,11 @@ router.put('/:id/coordinates', requireSessionUser, async (req, res) => {
     }
 
     // Check permissions (owner or operator can update)
-    const isOwner = loft.manager?._id.toString() === req.auth.userId;
+    const isOwner =
+      String(loft.manager || "") === String(req.auth.userId || "") ||
+      String(loft.ownerId || "") === String(req.auth.userId || "");
     const isOperator =
-      req.auth.user.role === 'operator' ||
-      req.auth.user.role === 'admin' ||
+      hasRoleBucket(req.auth, 'operator') ||
       hasGlobalTenantAccess(req.auth);
     
     if (!isOwner && !isOperator) {
@@ -175,12 +177,15 @@ router.get('/:id/gps-status', requireSessionUser, async (req, res) => {
     }
 
     // Check permissions
-    const isOwner = loft.manager?._id.toString() === req.auth.userId;
+    const isOwner =
+      String(loft.manager || "") === String(req.auth.userId || "") ||
+      String(loft.ownerId || "") === String(req.auth.userId || "");
     const isOperator =
-      req.auth.user.role === 'operator' ||
-      req.auth.user.role === 'admin' ||
+      hasRoleBucket(req.auth, 'operator') ||
       hasGlobalTenantAccess(req.auth);
-    const isClubMember = req.auth.affiliations?.some(aff => aff.club?._id.toString() === loft.club?._id.toString());
+    const isClubMember = req.auth.affiliations?.some((aff) =>
+      String(aff.club?._id || aff.club || "") === String(loft.club || loft.clubId || ""),
+    );
     
     if (!isOwner && !isOperator && !isClubMember) {
       return res.status(403).json({

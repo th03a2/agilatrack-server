@@ -1,6 +1,11 @@
 import express from "express";
 import { getSuggestions, queryChatbot } from "../controllers/Chatbot.js";
 import { requireSessionUser } from "../middleware/sessionAuth.js";
+import Affiliations from "../models/Affiliations.js";
+import Birds from "../models/Birds.js";
+import Clubs from "../models/Clubs.js";
+import Races from "../models/Races.js";
+import Users from "../models/Users.js";
 
 const router = express.Router();
 
@@ -14,15 +19,10 @@ router.use(requireSessionUser);
 // New endpoints for smart chatbot
 router.get("/stats", async (req, res) => {
   try {
-    const Club = require("../models/Club");
-    const User = require("../models/User");
-    const Pigeon = require("../models/Pigeon");
-    const Race = require("../models/Race");
-
-    const totalClubs = await Club.countDocuments({ status: 'active' });
-    const totalBirds = await Pigeon.countDocuments();
-    const totalUsers = await User.countDocuments({ isActive: true });
-    const upcomingRaces = await Race.countDocuments({ 
+    const totalClubs = await Clubs.countDocuments({ isActive: true, status: 'approved' });
+    const totalBirds = await Birds.countDocuments({ deletedAt: { $exists: false } });
+    const totalUsers = await Users.countDocuments({ isActive: true });
+    const upcomingRaces = await Races.countDocuments({ 
       status: { $in: ['draft', 'booking_open'] },
       raceDate: { $gte: new Date() }
     });
@@ -47,8 +47,7 @@ router.get("/stats", async (req, res) => {
 
 router.get("/clubs/count", async (req, res) => {
   try {
-    const Club = require("../models/Club");
-    const count = await Club.countDocuments({ status: 'active' });
+    const count = await Clubs.countDocuments({ isActive: true, status: 'approved' });
     res.json({ count });
   } catch (error) {
     console.error('Chatbot club count error:', error);
@@ -58,8 +57,7 @@ router.get("/clubs/count", async (req, res) => {
 
 router.get("/birds/count", async (req, res) => {
   try {
-    const Pigeon = require("../models/Pigeon");
-    const count = await Pigeon.countDocuments();
+    const count = await Birds.countDocuments({ deletedAt: { $exists: false } });
     res.json({ count });
   } catch (error) {
     console.error('Chatbot birds count error:', error);
@@ -69,8 +67,7 @@ router.get("/birds/count", async (req, res) => {
 
 router.get("/races/upcoming", async (req, res) => {
   try {
-    const Race = require("../models/Race");
-    const count = await Race.countDocuments({ 
+    const count = await Races.countDocuments({ 
       status: { $in: ['draft', 'booking_open'] },
       raceDate: { $gte: new Date() }
     });
@@ -83,24 +80,13 @@ router.get("/races/upcoming", async (req, res) => {
 
 router.get("/me/status", async (req, res) => {
   try {
-    const token = req.headers.authorization?.replace('Bearer ', '');
-    if (!token) {
-      return res.status(401).json({ error: 'No token provided' });
-    }
-
-    // Verify token and get user (implement based on your auth system)
-    const jwt = require('jsonwebtoken');
-    const decoded = jwt.verify(token, process.env.JWT_SECRET);
-    
-    const User = require("../models/User");
-    const user = await User.findById(decoded.userId).select('role email name isActive');
+    const user = await Users.findById(req.auth?.userId).select('role email fullName isActive membershipStatus');
     if (!user) {
       return res.status(404).json({ error: 'User not found' });
     }
 
     // Check if user has club applications
-    const Affiliation = require("../models/Affiliation");
-    const applications = await Affiliation.find({ userId: user._id });
+    const applications = await Affiliations.find({ user: user._id }).populate('club', 'name');
     
     // Check if user is member of any club
     const activeMembership = applications.find(app => app.status === 'approved');
@@ -108,8 +94,7 @@ router.get("/me/status", async (req, res) => {
     // Get club name if member
     let clubName = null;
     if (activeMembership) {
-      const Club = require("../models/Club");
-      const club = await Club.findById(activeMembership.clubId).select('name');
+      const club = activeMembership.club;
       clubName = club ? club.name : null;
     }
 
@@ -122,9 +107,6 @@ router.get("/me/status", async (req, res) => {
     });
   } catch (error) {
     console.error('Chatbot user status error:', error);
-    if (error.name === 'JsonWebTokenError') {
-      return res.status(401).json({ error: 'Invalid token' });
-    }
     res.status(500).json({ error: 'Internal server error' });
   }
 });
